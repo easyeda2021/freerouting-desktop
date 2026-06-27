@@ -1,7 +1,10 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,13 +12,14 @@ import (
 	webview "github.com/webview/webview_go"
 )
 
+//go:embed all:frontend/dist
+var dist embed.FS
+
 func main() {
 	log.SetFlags(log.Ltime)
 
-	// Start CORS proxy in background
 	go startCORSProxy()
 
-	// Handle graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -30,7 +34,6 @@ func main() {
 	w.SetTitle("FreeRouting Desktop")
 	w.SetSize(1400, 900, webview.HintNone)
 
-	// Bind Go functions to JS
 	w.Bind("checkFRStatus", checkFRStatus)
 	w.Bind("downloadFR", downloadFR)
 	w.Bind("startFR", startFR)
@@ -40,32 +43,17 @@ func main() {
 	w.Bind("readFile", readFile)
 	w.Bind("writeFile", writeFile)
 
-	// Dev mode: load from Vite dev server; Prod mode: load from embedded dist
 	devMode := os.Getenv("FR_DEV") != "0"
 	if devMode {
 		log.Println("Dev mode: loading from http://localhost:1420")
 		w.Navigate("http://localhost:1420")
 	} else {
-		distPath := getDistPath()
-		log.Printf("Prod mode: loading from %s", distPath)
-		w.Navigate("file://" + distPath + "/index.html")
+		sub, _ := fs.Sub(dist, "frontend/dist")
+		http.Handle("/", http.FileServer(http.FS(sub)))
+		go http.ListenAndServe("127.0.0.1:1421", nil)
+		log.Println("Prod mode: serving embedded dist on :1421")
+		w.Navigate("http://127.0.0.1:1421")
 	}
 
 	w.Run()
-}
-
-func getDistPath() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return "dist"
-	}
-	dir, _ := os.MkdirTemp("", "fr")
-	_ = dir
-	// In prod, dist/ is in the same directory as the executable
-	for i := len(exe) - 1; i >= 0; i-- {
-		if exe[i] == os.PathSeparator {
-			return exe[:i] + string(os.PathSeparator) + "dist"
-		}
-	}
-	return "dist"
 }
