@@ -1,108 +1,73 @@
-"""Generate ICO and PNG icons — PCB auto-routing style.
-Blue traces, grey vias, 45-degree corners, transparent background."""
-from PIL import Image, ImageDraw
+"""Generate ICO and PNG — PCB routing icon with blue traces, grey vias, 'FR' text."""
 import struct, os
+from PIL import Image, ImageDraw, ImageFont
 
 SIZES = [16, 24, 32, 48, 64, 128, 256]
-OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "images")
-ICO_PATH = os.path.join(OUT_DIR, "logo.ico")
-PNG_PATH = os.path.join(OUT_DIR, "logo.png")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PNG = os.path.join(ROOT, "images", "logo.png")
+ICO = os.path.join(ROOT, "images", "logo.ico")
 
-TRACE_COLORS = [
-    (41, 128, 255, 255),   # blue
-    (72, 156, 255, 255),   # lighter blue
-    (30, 100, 220, 255),   # darker blue
-    (100, 180, 255, 255),  # light blue
-]
-VIA_COLOR = (160, 160, 170, 255)       # grey
-VIA_RING = (120, 120, 130, 255)        # darker grey ring
-BOARD_COLOR = (34, 40, 49, 255)        # dark board fill
-BOARD_STROKE = (60, 70, 85, 255)       # board border
+BLUE = (41, 128, 255, 255)
+BLUE2 = (72, 156, 255, 255)
+VIA = (160, 160, 170, 255)
+TEXT = (220, 220, 230, 255)
+BOARD = (26, 26, 46, 255)
 
-def draw_icon(size):
+def icon(size):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    m = size / 256
+    s = size / 16
+    pad = int(s * 0.5)
 
-    # Board background (rounded rect)
-    d.rounded_rectangle(
-        [int(16*m), int(16*m), int(240*m), int(240*m)],
-        radius=int(10*m), fill=BOARD_COLOR, outline=BOARD_STROKE,
-        width=max(1, int(2*m))
-    )
+    # Board
+    d.rounded_rectangle([pad, pad, size-pad, size-pad], radius=max(1,int(s*1.5)), fill=BOARD)
 
-    w = max(1, int(3.5 * m))
-    via_r = max(1, int(4.5 * m))
-    ring_r = max(1, int(6 * m))
+    w = max(1, int(s * 1.0))
 
-    def trace(pts, color):
-        scaled = [(int(p[0]*m), int(p[1]*m)) for p in pts]
-        d.line(scaled, fill=color, width=w, joint="curve")
+    # Route 1 (top) — diagonal PCB traces
+    r1 = [(2,4), (5,4), (6.5,5.5), (8,5.5), (10,7.5), (14,7.5)]
+    for i in range(len(r1)-1):
+        d.line([(r1[i][0]*s, r1[i][1]*s), (r1[i+1][0]*s, r1[i+1][1]*s)], fill=BLUE, width=w)
 
-    def via(cx, cy):
-        x, y, r = int(cx*m), int(cy*m), ring_r
-        d.ellipse([x-r, y-r, x+r, y+r], fill=VIA_RING)
-        d.ellipse([x-via_r, y-via_r, x+via_r, y+via_r], fill=VIA_COLOR)
+    # Route 2 (bottom)
+    r2 = [(2.5,10.5), (5,10.5), (7,9), (9,9), (11,10), (14,10)]
+    for i in range(len(r2)-1):
+        d.line([(r2[i][0]*s, r2[i][1]*s), (r2[i+1][0]*s, r2[i+1][1]*s)], fill=BLUE2, width=w)
 
-    # === 45-degree routing paths ===
+    # Vias at junctions
+    for (x, y) in [(5,4), (6.5,5.5), (10,7.5), (5,10.5), (7,9), (11,10)]:
+        r = max(1, int(s * 0.9))
+        d.ellipse([x*s-r, y*s-r, x*s+r, y*s+r], fill=VIA)
 
-    # Route 1: top-left → top-right, horizontal then 45° down
-    trace([(30,50), (100,50), (130,80), (160,80), (190,110), (220,110)], TRACE_COLORS[0])
-    via(100, 50)
-    via(130, 80)
-    via(190, 110)
-
-    # Route 2: middle-left → bottom-right, 45° down then horizontal
-    trace([(30,130), (70,130), (100,160), (150,160), (180,190), (220,190)], TRACE_COLORS[1])
-    via(70, 130)
-    via(100, 160)
-    via(180, 190)
-
-    # Route 3: bottom-left → middle-right, horizontal then 45° up
-    trace([(30,210), (80,210), (110,180), (140,180), (170,150), (220,150)], TRACE_COLORS[2])
-    via(80, 210)
-    via(110, 180)
-    via(170, 150)
-
-    # Route 4: vertical route, center column
-    trace([(160,40), (160,70), (190,100), (190,130), (160,160), (160,200)], TRACE_COLORS[3])
-    via(160, 70)
-    via(190, 100)
-    via(190, 130)
-    via(160, 160)
-
-    # Route 5: short cross route
-    trace([(60,80), (100,80), (120,100), (140,100), (160,120)], TRACE_COLORS[0])
-    via(120, 100)
-    via(160, 120)
+    # "FR" text
+    try:
+        f = ImageFont.truetype("segoeui.ttf", max(6, int(s*4)))
+    except Exception:
+        f = ImageFont.load_default()
+    b = d.textbbox((0, 0), "FR", font=f)
+    tx = (size - b[2] + b[0]) // 2
+    d.text((tx, int(s*10.5) - (b[3]-b[1])//2), "FR", fill=TEXT, font=f)
 
     return img
 
-# Generate PNG
-main = draw_icon(256)
-main.save(PNG_PATH)
-print(f"Generated {PNG_PATH}")
+main = icon(256)
+main.save(PNG)
+print(f"Generated {PNG}")
 
-# Generate ICO
-ico_images = [draw_icon(s).convert("RGBA") for s in SIZES]
-
-with open(ICO_PATH, "wb") as f:
+imgs = [icon(s).convert("RGBA") for s in SIZES]
+with open(ICO, "wb") as f:
     f.write(struct.pack("<HHH", 0, 1, len(SIZES)))
-    data_start = 6 + 16 * len(SIZES)
-    png_chunks = []
-    for i, img in enumerate(ico_images):
+    off = 6 + 16 * len(SIZES)
+    chunks = []
+    for i, img in enumerate(imgs):
         from io import BytesIO
-        buf = BytesIO()
-        img.save(buf, "PNG")
-        data = buf.getvalue()
-        png_chunks.append(data)
+        b = BytesIO(); img.save(b, "PNG"); data = b.getvalue()
+        chunks.append(data)
         sz = SIZES[i]
         w = 0 if sz >= 256 else sz
         h = 0 if sz >= 256 else sz
-        f.write(struct.pack("<BBBBHHIH", w, h, 0, 0, 1, 32, len(data), data_start))
-        data_start += len(data)
-    for data in png_chunks:
+        f.write(struct.pack("<BBBBHHIH", w, h, 0, 0, 1, 32, len(data), off))
+        off += len(data)
+    for data in chunks:
         f.write(data)
-
-print(f"Generated {ICO_PATH} ({len(SIZES)} sizes)")
-print("Done.")
+print(f"Generated {ICO} ({len(SIZES)} sizes)")
