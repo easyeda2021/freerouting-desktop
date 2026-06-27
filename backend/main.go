@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	webview "github.com/webview/webview_go"
 )
@@ -21,6 +22,8 @@ var (
 )
 
 func main() {
+	logFile, _ := os.Create(getFRDir() + "/app.log")
+	log.SetOutput(logFile)
 	log.SetFlags(log.Ltime)
 	log.Printf("FreeRouting Desktop %s (%s)", version, platform)
 
@@ -33,6 +36,18 @@ func main() {
 		stopFR()
 		os.Exit(0)
 	}()
+
+	// Verify embed works
+	sub, err := fs.Sub(dist, "dist")
+	if err != nil {
+		log.Printf("embed error: %v", err)
+		// List embedded files for debugging
+		fs.WalkDir(dist, ".", func(path string, d os.DirEntry, err error) error {
+			log.Printf("  embed: %s", path)
+			return nil
+		})
+		return
+	}
 
 	w := webview.New(false)
 	defer w.Destroy()
@@ -54,9 +69,16 @@ func main() {
 		log.Println("Dev mode: loading from http://localhost:1420")
 		w.Navigate("http://localhost:1420")
 	} else {
-		sub, _ := fs.Sub(dist, "dist")
 		http.Handle("/", http.FileServer(http.FS(sub)))
-		go http.ListenAndServe("127.0.0.1:1421", nil)
+		ready := make(chan struct{})
+		go func() {
+			ready <- struct{}{}
+			if err := http.ListenAndServe("127.0.0.1:1421", nil); err != nil {
+				log.Printf("HTTP server: %v", err)
+			}
+		}()
+		<-ready
+		time.Sleep(50 * time.Millisecond) // let the listener bind
 		log.Println("Prod mode: serving embedded dist on :1421")
 		w.Navigate("http://127.0.0.1:1421")
 	}
