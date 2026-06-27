@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+frontend/dist/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+freerouting-desktop
+freerouting-desktop-mac
+freerouting-desktop-linux
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
