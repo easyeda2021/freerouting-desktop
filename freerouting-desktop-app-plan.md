@@ -197,29 +197,29 @@ export default defineConfig({
 
 ### 2.1 目录结构
 
-JAR 和相关文件存放在用户 app data 目录下：
+JAR 和相关文件存放在用户目录（非安装目录）下：
 ```
-{app_data_dir}/freerouting/
-├── freerouting.jar
+{HOME}/Freerouting-Desktop/freerouting/
+├── freerouting-executable.jar
 ├── version.txt
 └── java/                  # 未来扩展：便携版 JRE
 ```
 
 各平台路径：
-- Windows: `%APPDATA%/freerouting/`
-- macOS: `~/Library/Application Support/freerouting/`
-- Linux: `~/.config/freerouting/`
+- Windows: `C:\Users\<用户名>\Freerouting-Desktop\freerouting\`
+- macOS: `/Users/<用户名>/Freerouting-Desktop/freerouting/`
+- Linux: `/home/<用户名>/Freerouting-Desktop/freerouting/`
 
 ### 2.2 功能点
 
 #### JAR 状态检查
-- 启动时检查 `freerouting.jar` 是否存在
+- 启动时检查 `freerouting-executable.jar` 是否存在
 - 读取 `version.txt` 获取当前版本
 - Go 通过 WebView `w.Bind()` 暴露 `checkJarStatus()` 给前端
 
 #### JAR 下载
 - 从 FreeRouting GitHub Releases 下载最新 executable JAR
-- 下载 URL: `https://github.com/andrasfuchs/freerouting/releases/latest/download/freerouting-executable.jar`
+- 下载 URL: `https://github.com/freerouting/freerouting/releases/latest/download/freerouting-executable.jar`
 - 通过 WebView `w.Eval()` 推送下载进度百分比到前端
 - 下载完成后写入 app data 目录
 
@@ -734,7 +734,7 @@ interface AppState {
 
 ```
 应用启动
-  → Go: 检查 app_data 目录下 freerouting.jar
+  → Go: 检查 app_data 目录下 freerouting-executable.jar
   → 不存在 → Go: 从 GitHub Releases 下载
     → 通过 w.Eval() 推送进度到前端
     → 下载完成 → Go: 启动 JAR 进程
@@ -840,7 +840,7 @@ Go 生产构建时，将 `w.Navigate()` 指向内嵌的 `dist/` 目录（使用 
 ### 8.4 首次运行
 
 安装后首次启动：
-1. Go 宿主检查 app data 目录下 `freerouting.jar`
+1. Go 宿主检查 app data 目录下 `freerouting-executable.jar`
 2. 不存在 → 从 GitHub Releases 下载（约 8-15MB）
 3. 自动启动 JAR 进程
 4. 进入主界面
@@ -881,7 +881,7 @@ Go 生产构建时，将 `w.Navigate()` 指向内嵌的 `dist/` 目录（使用 
 
 ```
 # 基础 API 模式启动（本地使用）
-java -jar freerouting.jar \
+java -jar freerouting-executable.jar \
   --api_server.enabled=true \
   --api_server.endpoints=http://127.0.0.1:37864 \
   --api_server.authentication.enabled=false \

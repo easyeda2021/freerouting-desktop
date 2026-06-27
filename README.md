@@ -1,6 +1,6 @@
 # FreeRouting Desktop
 
-Modern desktop GUI for [FreeRouting](https://github.com/andrasfuchs/freerouting), a Java PCB auto-router.
+Modern desktop GUI for [FreeRouting](https://github.com/freerouting/freerouting), a Java PCB auto-router.
 
 Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host manages the FreeRouting JAR process and provides a native WebView window. The frontend (React + TypeScript + LeaferJS) renders the PCB board and communicates directly with the JAR's HTTP API through a CORS proxy.
 
@@ -67,8 +67,8 @@ GOOS=linux   go build -ldflags="-s -w" -o freerouting-desktop-linux .
 
 ## How It Works
 
-1. App starts → Go host checks for `freerouting.jar` in app data dir → downloads from GitHub Releases if missing
-2. Go host launches JAR in API mode (`java -jar freerouting.jar --api_server.enabled=true ...`)
+1. App starts → Go host checks for `freerouting-executable.jar` in app data dir → downloads from GitHub Releases if missing
+2. Go host launches JAR in API mode (`java -jar freerouting-executable.jar --api_server.enabled=true ...`)
 3. Frontend opens DSN file → sends to JAR API via CORS proxy → starts routing
 4. JAR pushes progress via SSE → frontend parses SES output → LeaferJS renders PCB board in real-time
 5. User exports completed SES file
