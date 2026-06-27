@@ -1,36 +1,46 @@
 VERSION := $(shell cat VERSION | tr -d '\n\r ')
 BINARY := freerouting-desktop
+ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: all clean frontend windows macos linux
+.PHONY: all clean frontend windows macos macos-arm linux
 
 all: windows
 
 frontend:
-	cd frontend && npm run build
+	cd $(ROOT)frontend && npm run build
 
-windows: frontend
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
+# Copy frontend dist into backend/ for Go embed
+backend/dist: frontend
+	rm -rf $(ROOT)backend/dist
+	cp -r $(ROOT)frontend/dist $(ROOT)backend/dist
+
+windows: backend/dist
+	cd $(ROOT)backend && \
+		GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
 		go build -ldflags="-s -w -H windowsgui -X main.version=$(VERSION) -X main.platform=windows" \
-		-o build/$(BINARY)-$(VERSION)-windows-x64.exe .
-	cd build && zip $(BINARY)-$(VERSION)-windows-x64.zip $(BINARY)-$(VERSION)-windows-x64.exe
+		-o $(ROOT)build/$(BINARY)-$(VERSION)-windows-x64.exe .
+	cd $(ROOT)build && zip $(BINARY)-$(VERSION)-windows-x64.zip $(BINARY)-$(VERSION)-windows-x64.exe
 
-macos: frontend
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
+macos: backend/dist
+	cd $(ROOT)backend && \
+		GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
 		go build -ldflags="-s -w -X main.version=$(VERSION) -X main.platform=macos" \
-		-o build/$(BINARY)-$(VERSION)-macos-x64 .
-	cd build && tar -czf $(BINARY)-$(VERSION)-macos-x64.tar.gz $(BINARY)-$(VERSION)-macos-x64
+		-o $(ROOT)build/$(BINARY)-$(VERSION)-macos-x64 .
+	cd $(ROOT)build && tar -czf $(BINARY)-$(VERSION)-macos-x64.tar.gz $(BINARY)-$(VERSION)-macos-x64
 
-macos-arm: frontend
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
+macos-arm: backend/dist
+	cd $(ROOT)backend && \
+		GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
 		go build -ldflags="-s -w -X main.version=$(VERSION) -X main.platform=macos" \
-		-o build/$(BINARY)-$(VERSION)-macos-arm64 .
-	cd build && tar -czf $(BINARY)-$(VERSION)-macos-arm64.tar.gz $(BINARY)-$(VERSION)-macos-arm64
+		-o $(ROOT)build/$(BINARY)-$(VERSION)-macos-arm64 .
+	cd $(ROOT)build && tar -czf $(BINARY)-$(VERSION)-macos-arm64.tar.gz $(BINARY)-$(VERSION)-macos-arm64
 
-linux: frontend
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
+linux: backend/dist
+	cd $(ROOT)backend && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
 		go build -ldflags="-s -w -X main.version=$(VERSION) -X main.platform=linux" \
-		-o build/$(BINARY)-$(VERSION)-linux-x64 .
-	cd build && tar -czf $(BINARY)-$(VERSION)-linux-x64.tar.gz $(BINARY)-$(VERSION)-linux-x64
+		-o $(ROOT)build/$(BINARY)-$(VERSION)-linux-x64 .
+	cd $(ROOT)build && tar -czf $(BINARY)-$(VERSION)-linux-x64.tar.gz $(BINARY)-$(VERSION)-linux-x64
 
 clean:
-	rm -rf build/
+	rm -rf $(ROOT)build/ $(ROOT)backend/dist/

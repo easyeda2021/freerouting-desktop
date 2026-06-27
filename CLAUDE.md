@@ -9,21 +9,21 @@ FreeRouting Desktop — Go + WebView PCB auto-router GUI.
 cd frontend && npm run dev          # → localhost:1420
 
 # Go host (dev mode, loads frontend from Vite dev server)
-export CC=/c/msys64/mingw64/bin/gcc && go run .
+export CC=/c/msys64/mingw64/bin/gcc && cd backend && go run .
 
 # Production build
-cd frontend && npm run build        # → ../dist/
-go build -ldflags="-s -w" -o freerouting-desktop .
+make windows
 ```
 
 ## Architecture
 
 ```
-Go host (main.go)
+Go host (backend/)
+├── main.go            — Entry point, WebView window, Go↔JS bridge
 ├── fr_installer.go    — FR detection, download, install, process lifecycle
-├── cors_proxy.go      — Reverse proxy that adds CORS headers to FR responses (:9080→:37864)
+├── cors_proxy.go      — Reverse proxy that adds CORS headers (:9080→:37864)
 ├── file_dialog.go     — Native file dialogs (Win/Mac/Linux)
-└── WebView window     — Loads frontend (dev: localhost:1420, prod: file://dist/)
+└── dist/              — (generated) copied from frontend/dist for embed
 
 Frontend (frontend/src/)
 ├── App.tsx           — Root component, global state (React Context + useReducer)
@@ -102,16 +102,23 @@ S-expression based. Key structures:
 
 ```
 freerouting-desktop/
-├── main.go
-├── fr_installer.go
-├── cors_proxy.go
-├── file_dialog.go
-├── go.mod / go.sum
-├── frontend/
+├── backend/               # Go host
+│   ├── main.go
+│   ├── fr_installer.go
+│   ├── cors_proxy.go
+│   ├── file_dialog.go
+│   ├── go.mod / go.sum
+│   └── dist/              # (generated)
+├── frontend/              # React frontend
 │   ├── src/ (as above)
 │   ├── package.json
 │   └── vite.config.ts
-├── dist/              # frontend build output
+├── docs/                  # Documentation
+│   └── freerouting-desktop-app-plan.md
+├── images/                # App icons
+├── build/                 # Build artifacts
+├── Makefile
+├── VERSION
 ├── README.md
-└── freerouting-desktop-app-plan.md
+└── CLAUDE.md
 ```

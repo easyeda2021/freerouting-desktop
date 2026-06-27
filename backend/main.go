@@ -12,7 +12,7 @@ import (
 	webview "github.com/webview/webview_go"
 )
 
-//go:embed all:frontend/dist
+//go:embed all:dist
 var dist embed.FS
 
 var (
@@ -54,7 +54,7 @@ func main() {
 		log.Println("Dev mode: loading from http://localhost:1420")
 		w.Navigate("http://localhost:1420")
 	} else {
-		sub, _ := fs.Sub(dist, "frontend/dist")
+		sub, _ := fs.Sub(dist, "dist")
 		http.Handle("/", http.FileServer(http.FS(sub)))
 		go http.ListenAndServe("127.0.0.1:1421", nil)
 		log.Println("Prod mode: serving embedded dist on :1421")

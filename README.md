@@ -48,7 +48,7 @@ npm install
 npm run dev          # → localhost:1420
 
 # Go host (separate terminal)
-go run .             # opens WebView loading localhost:1420
+cd backend && go run .   # opens WebView loading localhost:1420
 ```
 
 ### Build
