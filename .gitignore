@@ -6,6 +6,8 @@ frontend/node_modules/
 dist/
 frontend/dist/
 backend/dist/
+backend/*.syso
+backend/icon.png
 build/
 
 # Go
