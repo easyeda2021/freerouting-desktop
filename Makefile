@@ -10,7 +10,7 @@ frontend:
 
 windows: frontend
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
-		go build -ldflags="-s -w -X main.version=$(VERSION) -X main.platform=windows" \
+		go build -ldflags="-s -w -H windowsgui -X main.version=$(VERSION) -X main.platform=windows" \
 		-o build/$(BINARY)-$(VERSION)-windows-x64.exe .
 	cd build && zip $(BINARY)-$(VERSION)-windows-x64.zip $(BINARY)-$(VERSION)-windows-x64.exe
 

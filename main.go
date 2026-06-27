@@ -49,7 +49,7 @@ func main() {
 	w.Bind("readFile", readFile)
 	w.Bind("writeFile", writeFile)
 
-	devMode := os.Getenv("FR_DEV") != "0"
+	devMode := os.Getenv("FR_DEV") == "1"
 	if devMode {
 		log.Println("Dev mode: loading from http://localhost:1420")
 		w.Navigate("http://localhost:1420")
