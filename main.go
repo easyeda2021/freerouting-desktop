@@ -15,8 +15,14 @@ import (
 //go:embed all:frontend/dist
 var dist embed.FS
 
+var (
+	version  = "dev"
+	platform = "dev"
+)
+
 func main() {
 	log.SetFlags(log.Ltime)
+	log.Printf("FreeRouting Desktop %s (%s)", version, platform)
 
 	go startCORSProxy()
 
@@ -31,7 +37,7 @@ func main() {
 	w := webview.New(false)
 	defer w.Destroy()
 
-	w.SetTitle("FreeRouting Desktop")
+	w.SetTitle("FreeRouting Desktop " + version)
 	w.SetSize(1400, 900, webview.HintNone)
 
 	w.Bind("checkFRStatus", checkFRStatus)
