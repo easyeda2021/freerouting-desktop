@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -134,6 +135,40 @@ func saveFileDialogLinux(defaultName string) (string, error) {
 
 // Ensure the app data directory exists
 func init() {
-	dir := getAppDataDir()
-	os.MkdirAll(dir, 0755)
+	os.MkdirAll(getFRDir(), 0755)
+	os.MkdirAll(filepath.Join(getFRDir(), "downloads"), 0755)
+}
+
+// Public wrappers bound to JS
+
+func openFileDialog() string {
+	path, err := openNativeFileDialog()
+	if err != nil {
+		return ""
+	}
+	return path
+}
+
+func saveFileDialog(defaultName string) string {
+	path, err := saveNativeFileDialog(defaultName)
+	if err != nil {
+		return ""
+	}
+	return path
+}
+
+func readFile(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func writeFile(path string, data string) string {
+	err := os.WriteFile(path, []byte(data), 0644)
+	if err != nil {
+		return err.Error()
+	}
+	return ""
 }

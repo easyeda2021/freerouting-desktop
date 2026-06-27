@@ -53,8 +53,8 @@ export interface LogEntry {
   topic: string
 }
 
-export interface JarStatusData {
-  status: 'loading' | 'not-installed' | 'downloading' | 'ready' | 'error'
+export interface FRStatusData {
+  status: 'loading' | 'not-installed' | 'downloading' | 'installing' | 'ready' | 'error'
   version?: string
   progress: number
   message?: string

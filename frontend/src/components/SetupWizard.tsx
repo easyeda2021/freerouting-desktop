@@ -1,27 +1,26 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../App'
 
-export default function JarSetupWizard() {
+export default function SetupWizard() {
   const { state, dispatch } = useApp()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function check() {
       try {
-        const raw = window.checkJarStatus()
+        const raw = window.checkFRStatus()
         const status = JSON.parse(raw)
-        dispatch({ type: 'SET_JAR_STATUS', payload: status })
+        dispatch({ type: 'SET_FR_STATUS', payload: status })
 
         if (status.status === 'not-installed') {
-          window.downloadJar()
+          window.downloadFR()
 
-          // Poll download progress
           const poll = setInterval(() => {
-            const s = JSON.parse(window.checkJarStatus())
-            dispatch({ type: 'SET_JAR_STATUS', payload: s })
+            const s = JSON.parse(window.checkFRStatus())
+            dispatch({ type: 'SET_FR_STATUS', payload: s })
             if (s.status === 'ready') {
               clearInterval(poll)
-              startJarProcess()
+              startFRProcess()
             }
             if (s.status === 'error') {
               clearInterval(poll)
@@ -29,7 +28,7 @@ export default function JarSetupWizard() {
             }
           }, 500)
         } else if (status.status === 'ready') {
-          startJarProcess()
+          startFRProcess()
         } else if (status.status === 'error') {
           setError(status.message || 'Unknown error')
         }
@@ -40,18 +39,17 @@ export default function JarSetupWizard() {
     check()
   }, [])
 
-  const startJarProcess = () => {
-    const err = window.startJar()
+  const startFRProcess = () => {
+    const err = window.startFR()
     if (err) {
       setError(err)
     } else {
-      // Poll for JAR readiness
       const poll = setInterval(async () => {
         try {
           const res = await fetch('http://127.0.0.1:9080/v1/system/status')
           if (res.ok) {
-            const s = JSON.parse(window.checkJarStatus())
-            dispatch({ type: 'SET_JAR_STATUS', payload: s })
+            const s = JSON.parse(window.checkFRStatus())
+            dispatch({ type: 'SET_FR_STATUS', payload: s })
             clearInterval(poll)
           }
         } catch { /* still starting */ }
@@ -59,18 +57,18 @@ export default function JarSetupWizard() {
     }
   }
 
-  const { jarStatus, downloadProgress } = state
+  const { frStatus, downloadProgress } = state
 
   return (
     <div style={s.overlay}>
       <div style={s.modal}>
         <h2 style={s.title}>FreeRouting Desktop</h2>
 
-        {jarStatus === 'loading' && <p style={s.text}>Initializing...</p>}
+        {frStatus === 'loading' && <p style={s.text}>Initializing...</p>}
 
-        {jarStatus === 'not-installed' && (
+        {(frStatus === 'not-installed' || frStatus === 'downloading') && (
           <>
-            <p style={s.text}>FreeRouting engine not found. Downloading...</p>
+            <p style={s.text}>FreeRouting not found. Downloading...</p>
             <div style={s.progressBar}>
               <div style={{ ...s.progressFill, width: `${downloadProgress}%` }} />
             </div>
@@ -78,20 +76,14 @@ export default function JarSetupWizard() {
           </>
         )}
 
-        {jarStatus === 'downloading' && (
-          <>
-            <p style={s.text}>Downloading FreeRouting engine...</p>
-            <div style={s.progressBar}>
-              <div style={{ ...s.progressFill, width: `${downloadProgress}%` }} />
-            </div>
-            <p style={s.progressText}>{downloadProgress}%</p>
-          </>
+        {frStatus === 'installing' && (
+          <p style={s.text}>Installing FreeRouting...</p>
         )}
 
         {error && (
           <div style={s.error}>
             <p>Error: {error}</p>
-            <button style={s.retryBtn} onClick={() => window.downloadJar()}>
+            <button style={s.retryBtn} onClick={() => window.downloadFR()}>
               Retry
             </button>
           </div>
@@ -121,18 +113,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   title: { color: '#e94560', marginBottom: 24, fontSize: 20 },
   text: { color: '#aaa', marginBottom: 16, fontSize: 14 },
-  progressBar: {
-    height: 6,
-    background: '#0f3460',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    background: '#e94560',
-    transition: 'width 0.3s',
-  },
+  progressBar: { height: 6, background: '#0f3460', borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
+  progressFill: { height: '100%', background: '#e94560', transition: 'width 0.3s' },
   progressText: { color: '#888', fontSize: 12 },
   error: { marginTop: 16 },
   retryBtn: {
