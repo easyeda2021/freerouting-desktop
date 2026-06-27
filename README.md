@@ -1,30 +1,32 @@
 # FreeRouting Desktop
 
-Modern desktop GUI for [FreeRouting](https://github.com/freerouting/freerouting), a Java PCB auto-router.
+Modern desktop GUI for [FreeRouting](https://github.com/freerouting/freerouting), a PCB auto-router.
 
-Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host manages the FreeRouting JAR process and provides a native WebView window. The frontend (React + TypeScript + LeaferJS) renders the PCB board and communicates directly with the JAR's HTTP API through a CORS proxy.
+Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host detects whether FreeRouting is installed on the system, downloads and installs it if not, then launches it in API mode. The frontend (React + TypeScript + LeaferJS) renders the PCB board and communicates directly with the FreeRouting HTTP API through a CORS proxy.
 
 ## Architecture
 
 ```
-Go Host (WebView + JAR Manager + CORS Proxy)
+Go Host (WebView + FR Installer + CORS Proxy)
   └── WebView Window
        └── React Frontend (LeaferJS PCB Renderer + SES Parser)
-            ↓ fetch/SSE via CORS proxy
-       Java JAR (FreeRouting API :37864)
+            ↓ fetch/SSE via CORS proxy (:9080)
+       FreeRouting Process (API Mode :37864, self-contained JRE)
 ```
 
-- **Go host** (~5-10MB): WebView window, JAR download/process management, CORS reverse proxy, native file dialogs
-- **Frontend** (~2MB): React + TypeScript + LeaferJS for PCB canvas rendering, JS SES parser
-- **No Rust, no Node.js runtime bundled** — single Go binary + static HTML/JS
+- **Go host** (~5-10MB): WebView window, FR detection/download/install/process management, CORS proxy, native file dialogs
+- **Frontend** (~0.5MB gzipped): React + TypeScript + LeaferJS for PCB canvas rendering, JS SES parser
+- **No Rust, no Java, no Node.js runtime bundled** — single Go binary + static HTML/JS
 
 ## Platform Support
 
-| Platform | WebView Engine | Requirements |
-|----------|---------------|--------------|
-| Windows | Edge WebView2 | Win10+ (built-in) |
-| macOS | Cocoa WKWebView | Built-in |
-| Linux | GTK + WebKitGTK | `libgtk-3-dev libwebkit2gtk-4.1-dev` |
+| Platform | WebView Engine | FreeRouting Package |
+|----------|---------------|---------------------|
+| Windows | Edge WebView2 (built-in) | `.msi` installer |
+| macOS | Cocoa WKWebView (built-in) | `.dmg` image |
+| Linux | GTK + WebKitGTK | `.zip` archive |
+
+FreeRouting packages bundle their own JRE — users never need to install Java.
 
 ## Development
 
@@ -32,12 +34,11 @@ Go Host (WebView + JAR Manager + CORS Proxy)
 
 - [Go](https://go.dev/dl/) 1.21+
 - [Node.js](https://nodejs.org/) 18+
-- [Java](https://adoptium.net/) 17+ (for running FreeRouting JAR)
+- C compiler (MinGW-w64 on Windows, Xcode CLI on macOS, GCC on Linux)
 
 ### Setup
 
 ```bash
-# Clone
 git clone git@github.com:easyeda2021/freerouting-desktop.git
 cd freerouting-desktop
 
@@ -53,7 +54,6 @@ go run .             # opens WebView loading localhost:1420
 ### Build
 
 ```bash
-# Build frontend
 cd frontend && npm run build    # → ../dist/
 
 # Build Go binary
@@ -67,11 +67,12 @@ GOOS=linux   go build -ldflags="-s -w" -o freerouting-desktop-linux .
 
 ## How It Works
 
-1. App starts → Go host checks for `freerouting-executable.jar` in app data dir → downloads from GitHub Releases if missing
-2. Go host launches JAR in API mode (`java -jar freerouting-executable.jar --api_server.enabled=true ...`)
-3. Frontend opens DSN file → sends to JAR API via CORS proxy → starts routing
-4. JAR pushes progress via SSE → frontend parses SES output → LeaferJS renders PCB board in real-time
-5. User exports completed SES file
+1. App starts → Go host detects if FreeRouting is installed on the system
+2. If not installed → downloads the platform-specific package from GitHub Releases → installs to `~/Freerouting-Desktop/`
+3. Launches FreeRouting in API mode with `--gui.enabled=false`
+4. Frontend opens DSN file → sends to FR API via CORS proxy → starts routing
+5. FR pushes progress via SSE → frontend parses SES output → LeaferJS renders PCB board in real-time
+6. User exports completed SES file
 
 ## License
 

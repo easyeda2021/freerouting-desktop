@@ -9,7 +9,7 @@ FreeRouting Desktop — Go + WebView PCB auto-router GUI.
 cd frontend && npm run dev          # → localhost:1420
 
 # Go host (dev mode, loads frontend from Vite dev server)
-go run .
+export CC=/c/msys64/mingw64/bin/gcc && go run .
 
 # Production build
 cd frontend && npm run build        # → ../dist/
@@ -20,50 +20,49 @@ go build -ldflags="-s -w" -o freerouting-desktop .
 
 ```
 Go host (main.go)
-├── jar_manager.go    — JAR download, version check, process lifecycle
-├── cors_proxy.go     — Reverse proxy that adds CORS headers to JAR responses
-└── WebView window    — Loads frontend (dev: localhost:1420, prod: embedded dist/)
+├── fr_installer.go    — FR detection, download, install, process lifecycle
+├── cors_proxy.go      — Reverse proxy that adds CORS headers to FR responses (:9080→:37864)
+├── file_dialog.go     — Native file dialogs (Win/Mac/Linux)
+└── WebView window     — Loads frontend (dev: localhost:1420, prod: file://dist/)
 
 Frontend (frontend/src/)
 ├── App.tsx           — Root component, global state (React Context + useReducer)
 ├── components/
-│   ├── MenuBar.tsx        — File/Route/View/Help menus
+│   ├── MenuBar.tsx        — Open DSN, Export SES, FR status
 │   ├── BoardCanvas.tsx    — LeaferJS PCB renderer
 │   ├── SidePanel.tsx      — Layer visibility, board stats
 │   ├── ProgressPanel.tsx  — Routing progress bar
 │   ├── LogPanel.tsx       — Real-time scrollable log
-│   └── JarSetupWizard.tsx — First-run JAR download wizard
+│   └── SetupWizard.tsx    — First-run FR download/install wizard
 └── lib/
     ├── pcb-renderer.ts    — LeaferJS rendering engine
     ├── ses-parser.ts      — SES (Specctra Session File) parser
     ├── board-types.ts     — PCB data types (Trace, Via, Pad, Component)
-    └── api.ts             — JAR API client (fetch + SSE via CORS proxy)
+    └── api.ts             — FR API client (fetch + SSE via CORS proxy)
 ```
 
 ## Key Decisions
 
 - **Go host, not Tauri/Rust** — single ~5-10MB binary, cross-platform, fast compile
-- **Frontend calls JAR API directly** through Go CORS proxy at `127.0.0.1:9080` → `127.0.0.1:37864`
-- **SES parser in frontend JS** — no Rust/Go parser, same code for both environments
+- **No JAR, no Java** — FreeRouting v2.2.4+ ships platform installers (.msi/.dmg/.zip) with bundled JRE
+- **Detect existing install** — checks registry (Win), /Applications (Mac), PATH (Linux) first
+- **Auto-download if missing** — downloads platform package from GitHub Releases, installs to `~/Freerouting-Desktop/`
+- **Frontend calls FR API directly** through Go CORS proxy at `127.0.0.1:9080` → `127.0.0.1:37864`
+- **SES parser in frontend JS** — no Go parser needed
 - **LeaferJS** for PCB rendering (scene graph, zoom/pan, layers, events built-in)
 - **Pure CSS layout** — no UI framework
 - **React Context + useReducer** for state — no external state lib
-- JAR downloaded at first run from GitHub Releases, not bundled
 
 ## Go ↔ Frontend Bridge
 
 Go exposes functions to frontend via `w.Bind()`:
-- `checkJarStatus()` → `{status, version, progress}`
-- `downloadJar()` → async with progress callbacks
-- `startJar()` / `stopJar()`
+- `checkFRStatus()` → `{status, version, progress}`
+- `downloadFR()` → async with progress callbacks
+- `startFR()` / `stopFR()`
 - `openFileDialog()` / `saveFileDialog(name)`
 - `readFile(path)` / `writeFile(path, data)`
 
-Go pushes events to frontend via `w.Eval()`:
-- `jarStatusChanged(status)`
-- `downloadProgress(percent)`
-
-## JAR API (via CORS proxy at 127.0.0.1:9080)
+## FR API (via CORS proxy at 127.0.0.1:9080)
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -76,6 +75,19 @@ Go pushes events to frontend via `w.Eval()`:
 | GET | `/v1/jobs/{id}/output/stream` | SSE output stream |
 | GET | `/v1/jobs/{id}/logs/stream` | SSE log stream |
 | GET | `/v1/system/status` | Health check |
+
+## FR Startup (API mode, all platforms)
+
+```
+<fr-binary> \
+  --api_server.enabled=true \
+  --api_server.endpoints=http://127.0.0.1:37864 \
+  --api_server.authentication.enabled=false \
+  --api_server.idle_timeout=300 \
+  --gui.enabled=false \
+  --logging.console.level=INFO \
+  --logging.file.enabled=false
+```
 
 ## SES Format
 
@@ -91,8 +103,9 @@ S-expression based. Key structures:
 ```
 freerouting-desktop/
 ├── main.go
-├── jar_manager.go
+├── fr_installer.go
 ├── cors_proxy.go
+├── file_dialog.go
 ├── go.mod / go.sum
 ├── frontend/
 │   ├── src/ (as above)
