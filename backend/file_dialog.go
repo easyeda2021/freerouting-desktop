@@ -6,7 +6,14 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 )
+
+func hideWindow(cmd *exec.Cmd) {
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
+}
 
 func openNativeFileDialog() (string, error) {
 	switch runtime.GOOS {
@@ -63,7 +70,9 @@ if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 }
 $form.Dispose()
 `, filter, title)
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).Output()
+	cmd := exec.Command("powershell", "-NoProfile", "-Command", script)
+	hideWindow(cmd)
+	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +93,9 @@ if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 }
 $form.Dispose()
 `, defaultName)
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).Output()
+	cmd := exec.Command("powershell", "-NoProfile", "-Command", script)
+	hideWindow(cmd)
+	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
@@ -224,7 +235,9 @@ func writeFile(path string, data string) string {
 func openURL(url string) {
 	switch runtime.GOOS {
 	case "windows":
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		hideWindow(cmd)
+		cmd.Start()
 	case "darwin":
 		exec.Command("open", url).Start()
 	default:
