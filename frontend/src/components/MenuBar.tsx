@@ -82,6 +82,7 @@ export default function MenuBar() {
 
     const initialBoard = parseDsn(content)
     dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
+    dispatch({ type: 'SET_DSN_FILE', fileName })
     log('Info', `Parsed DSN: ${initialBoard.components.length} components, ${initialBoard.traces.length} traces, ${initialBoard.vias.length} vias`)
 
     log('Info', 'Creating FreeRouting session...')
@@ -159,12 +160,14 @@ export default function MenuBar() {
     try {
       const output = await getJobOutput(state.jobId)
       const sesContent = atob(output.data)
+      const baseName = state.currentDsn ? state.currentDsn.replace(/\.dsn$/i, '') : 'output'
+      const fileName = `${baseName}.ses`
       // Use Blob download (triggers native Save As in WebView2)
       const blob = new Blob([sesContent], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = output.filename || 'output.ses'
+      a.download = fileName
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -189,23 +192,19 @@ export default function MenuBar() {
             Open DSN
           </button>
           {state.jobState === 'RUNNING' ? (
-            <button style={{ ...s.btn, background: '#a91d3a' }} onClick={handleStopRouting}>
-              停止布线
+            <button style={s.btn} onClick={handleStopRouting}>
+              Stop Routing
             </button>
           ) : (
-            <button style={{ ...s.btn, background: '#1b9e4a' }} onClick={handleStartRouting} disabled={!state.jobId}>
-              自动布线
+            <button style={s.btn} onClick={handleStartRouting} disabled={!state.jobId}>
+              Route
             </button>
           )}
           <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
             Export SES
           </button>
         </div>
-        {state.frStatus === 'ready' ? (
-          <span style={s.connected}>FreeRouting Connected</span>
-        ) : (
-          <span style={s.version}>{state.frStatus}</span>
-        )}
+        <span style={s.fileName}>{state.currentDsn || ''}</span>
       </div>
     </>
   )
@@ -213,8 +212,7 @@ export default function MenuBar() {
 
 const s: Record<string, React.CSSProperties> = {
   bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
-  left: { display: 'flex', alignItems: 'center', gap: 6 },
-  btn: { padding: '4px 14px', border: '1px solid #888', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
-  connected: { fontSize: 12, color: '#fff', background: '#1b9e4a', padding: '3px 10px', borderRadius: 10, fontWeight: 500 },
-  version: { fontSize: 12, color: '#888' },
+  left: { display: 'flex', alignItems: 'center', gap: 8 },
+  btn: { padding: '5px 16px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
+  fileName: { fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
 }
