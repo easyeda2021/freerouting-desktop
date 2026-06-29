@@ -1,11 +1,10 @@
-import { App, Line, Ellipse, Group, Rect } from 'leafer-ui'
+import { App, Line, Ellipse, Group, Rect, Polygon } from 'leafer-ui'
 import '@leafer-in/view'
 import type { BoardData, ShapeData } from './board-types'
 
 const LAYER_COLORS = ['#e94560', '#0f3460', '#16c79a', '#f5a623', '#a855f7', '#06b6d4', '#84cc16', '#ec4899']
 const VIA_COLOR = '#a0a0a0'
 const VIA_STROKE = '#555555'
-const COMPONENT_SIZE = 800
 
 export function createPcbRenderer(container: HTMLElement) {
   const app = new App({
@@ -113,20 +112,34 @@ export function createPcbRenderer(container: HTMLElement) {
         }
       }
 
-      // Render component body markers
+      // Render component body markers (outline from pin bounding box)
       const compGroup = new Group({})
       app.tree.add(compGroup)
       for (const comp of data.components) {
         if (Number.isNaN(comp.location[0]) || Number.isNaN(comp.location[1])) continue
-        const half = COMPONENT_SIZE / 2
+        const image = imageMap.get(comp.package)
+        let minX = -100, minY = -100, maxX = 100, maxY = 100
+        if (image && image.pins.length > 0) {
+          minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity
+          for (const pin of image.pins) {
+            const p = rotatePoint(pin.x, pin.y, comp.rotation + pin.rotation)
+            if (p.x < minX) minX = p.x
+            if (p.y < minY) minY = p.y
+            if (p.x > maxX) maxX = p.x
+            if (p.y > maxY) maxY = p.y
+          }
+          if (!Number.isFinite(minX)) {
+            minX = -100; minY = -100; maxX = 100; maxY = 100
+          }
+        }
         const rect = new Rect({
-          x: -half,
-          y: -half,
-          width: COMPONENT_SIZE,
-          height: COMPONENT_SIZE,
-          fill: comp.side === 'back' ? '#a0a0a080' : '#e0e0e080',
-          stroke: '#8888',
-          strokeWidth: 20,
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+          fill: 'transparent',
+          stroke: comp.side === 'back' ? '#a0a0a0' : '#e0e0e0',
+          strokeWidth: Math.max(bounds.maxDim * 0.001, 1),
           rotation: comp.rotation,
         })
         const marker = new Group({
@@ -237,6 +250,18 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
         )
         group.add(capsule)
       }
+    }
+  } else if (shape.shapeType === 'polygon') {
+    const coords = shape.params.slice(1)
+    if (coords.length >= 6) {
+      group.add(
+        new Polygon({
+          points: coords,
+          fill: color,
+          stroke: darken(color),
+          strokeWidth: Math.max(shape.params[0] * 0.5, 0.5),
+        })
+      )
     }
   }
 }

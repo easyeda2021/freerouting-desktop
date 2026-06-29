@@ -354,11 +354,11 @@ export function parseDsn(content: string): BoardData {
             shapes.push({ layer, shapeType, params: [Number(shapeDef[2])] })
           } else if (shapeType === 'rect') {
             shapes.push({ layer, shapeType, params: [Number(shapeDef[2]), Number(shapeDef[3]), Number(shapeDef[4]), Number(shapeDef[5])] })
-          } else if (shapeType === 'path') {
+          } else if (shapeType === 'path' || shapeType === 'polygon') {
             const width = Number(shapeDef[2])
             const coords: number[] = []
             for (let i = 3; i < shapeDef.length; i++) coords.push(Number(shapeDef[i]))
-            shapes.push({ layer, shapeType, params: [width, ...coords] })
+            shapes.push({ layer, shapeType: shapeType as ShapeData['shapeType'], params: [width, ...coords] })
           }
         }
         boardData.padstacks.push({ name: padstackName, shapes })
