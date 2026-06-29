@@ -69,32 +69,29 @@ export default function MenuBar() {
       }
     })
 
-    // Start polling for routing results 5s after routing begins
-    setTimeout(() => {
-      const poll = setInterval(async () => {
-        try {
-          const status = await getJobStatus(jobId)
-          dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
-          if (status.state === 'COMPLETED' && !outputFetchedRef.current) {
-            outputFetchedRef.current = true
-            if (mergeTimerRef.current) {
-              clearTimeout(mergeTimerRef.current)
-              flushMerge()
-            }
-            try {
-              const output = await getJobOutput(jobId)
-              const sesContent = atob(output.data)
-              const boardData = parseSes(sesContent)
-              dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
-              log('Info', 'Final routing output merged')
-            } catch (err) {
-              console.error('Failed to fetch final SES output:', err)
-            }
+    const poll = setInterval(async () => {
+      try {
+        const status = await getJobStatus(jobId)
+        dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
+        if (status.state === 'COMPLETED' && !outputFetchedRef.current) {
+          outputFetchedRef.current = true
+          if (mergeTimerRef.current) {
+            clearTimeout(mergeTimerRef.current)
+            flushMerge()
           }
-          if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
-        } catch { /* ignore */ }
-      }, 2000)
-    }, 5000)
+          try {
+            const output = await getJobOutput(jobId)
+            const sesContent = atob(output.data)
+            const boardData = parseSes(sesContent)
+            dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
+            log('Info', 'Final routing output merged')
+          } catch (err) {
+            console.error('Failed to fetch final SES output:', err)
+          }
+        }
+        if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
+      } catch { /* ignore */ }
+    }, 2000)
   }
 
   const loadDsnFromContent = async (content: string, fileName: string) => {
