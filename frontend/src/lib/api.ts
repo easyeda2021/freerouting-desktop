@@ -64,26 +64,46 @@ export async function cancelRouting(jobId: string): Promise<void> {
 }
 
 export function streamLogs(jobId: string, onLog: (log: { timestamp: string; type: string; message: string; topic: string }) => void) {
-  const es = new EventSource(`${PROXY_BASE}/v1/jobs/${jobId}/logs/stream`)
-  es.onmessage = (event) => {
+  streamSSE(`${PROXY_BASE}/v1/jobs/${jobId}/logs/stream`, (data) => {
     try {
-      onLog(JSON.parse(event.data))
+      onLog(JSON.parse(data))
     } catch { /* ignore parse errors */ }
-  }
-  es.onerror = () => es.close()
-  return es
+  })
 }
 
 export function streamOutput(jobId: string, onOutput: (data: string) => void) {
-  const es = new EventSource(`${PROXY_BASE}/v1/jobs/${jobId}/output/stream`)
-  es.onmessage = (event) => {
+  streamSSE(`${PROXY_BASE}/v1/jobs/${jobId}/output/stream`, (data) => {
     try {
-      const parsed = JSON.parse(event.data)
-      if (parsed.data) {
-        onOutput(parsed.data)
-      }
+      const parsed = JSON.parse(data)
+      if (parsed.data) onOutput(parsed.data)
     } catch { /* ignore parse errors */ }
-  }
-  es.onerror = () => es.close()
-  return es
+  })
+}
+
+async function streamSSE(url: string, onData: (data: string) => void) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'text/event-stream',
+        'Freerouting-Profile-ID': PROFILE_ID,
+        'Freerouting-Environment-Host': 'FreeRoutingDesktop/0.1.0',
+      },
+    })
+    if (!res.ok || !res.body) return
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          onData(line.slice(6))
+        }
+      }
+    }
+  } catch { /* stream closed */ }
 }

@@ -38,6 +38,7 @@ export default function MenuBar() {
 
       // Parse and render DSN immediately
       const initialBoard = parseDsn(content)
+      console.log('DSN parsed:', initialBoard.traces.length, 'traces,', initialBoard.vias.length, 'vias,', initialBoard.layers.length, 'layers')
       dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
 
       // Then upload to FreeRouting for routing

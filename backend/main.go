@@ -90,5 +90,7 @@ func main() {
 	w.Navigate("http://127.0.0.1:1421")
 	log.Println("Step 5: running...")
 	w.Run()
+	log.Println("Window closed. Cleaning up FreeRouting process...")
+	stopFreeRouting()
 	log.Println("Exited.")
 }

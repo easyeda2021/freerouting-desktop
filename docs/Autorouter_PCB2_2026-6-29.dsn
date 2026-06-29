@@ -1,0 +1,170 @@
+(PCB "PCB2"
+  (parser
+    (host_cad "EasyEDA Pro")
+    (host_version "3.2.148")
+  )
+  (resolution mil 1000)
+  (structure
+    (boundary(path signal 0 0 0 0 1258.7 1745 1258.7 1745 0 0 0 )
+    )
+    (via via0
+    )
+    (grid via   0.25)
+    (grid wire   0.25)
+    (grid place   0.25)
+    (rule(clear 19.74))
+    (rule(clear 19.74 (type default_smd)))
+    (rule(clear 19.74 (type smd_smd)))
+    (rule(width 10.05))
+    (layer TopLayer
+      (type signal)
+    )
+    (layer BottomLayer
+      (type signal)
+    )
+    (layer Inner1
+      (type signal)
+    )
+  )
+
+  (placement
+    (component u1
+      (place u1 0 0 front 0
+      )
+    )
+  )
+  (library
+    (image u1
+      (pin p5014b3b9c847f4747 5014b3b9c847f4747 284.66 955)
+      (pin p5014b3b9c847f4747 5014b3b9c847f4748 225.34 955)
+      (pin pdd26d010d3da0f931 dd26d010d3da0f931 1275 895)
+      (pin pdd26d010d3da0f931 dd26d010d3da0f932 1175 795)
+      (pin pdd26d010d3da0f931 dd26d010d3da0f933 1175 995)
+      (pin pb7049f2a5688d88e14 b7049f2a5688d88e14 395 592.44)
+      (pin pb7049f2a5688d88e14 b7049f2a5688d88e15 395 647.56)
+      (pin p87767f3fc263165e10 87767f3fc263165e10 350 290)
+      (pin p87767f3fc263165e10 87767f3fc263165e11 350 190)
+      (pin p87767f3fc263165e10 87767f3fc263165e12 250 290)
+      (pin p87767f3fc263165e10 87767f3fc263165e13 250 190)
+      (pin pff56aeadccf7c11e1 ff56aeadccf7c11e1 1475.95 295)
+      (pin pff56aeadccf7c11e2 ff56aeadccf7c11e2 1231.95 204.4)
+      (pin pff56aeadccf7c11e2 ff56aeadccf7c11e3 1231.95 295)
+      (pin pff56aeadccf7c11e2 ff56aeadccf7c11e4 1231.95 385.5)
+    )
+
+    (padstack via0
+      (shape(circle TopLayer 24))
+      (shape(circle BottomLayer 24))
+      (shape(circle Inner1 24))
+    )
+
+    (padstack p5014b3b9c847f4747
+      (shape(polygon TopLayer 0.1 -15.88 -17.01 -15.88 17.01 -15.88 17.01 15.88 17.01 15.88 17.01 15.88 -17.01 15.88 -17.01 -15.88 -17.01))
+    )
+    (padstack pdd26d010d3da0f931
+      (shape(circle TopLayer 63 0 0))
+      (shape(circle BottomLayer 63 0 0))
+      (shape(circle Inner1 63 0 0))
+    )
+    (padstack pb7049f2a5688d88e14
+      (shape(polygon BottomLayer 0.1 -17.72 15.75 17.72 15.75 17.72 15.75 17.72 -15.75 17.72 -15.75 -17.72 -15.75 -17.72 -15.75 -17.72 15.75))
+    )
+    (padstack p87767f3fc263165e10
+      (shape(circle TopLayer 70.87 0 0))
+      (shape(circle BottomLayer 70.87 0 0))
+      (shape(circle Inner1 70.87 0 0))
+    )
+    (padstack pff56aeadccf7c11e1
+      (shape(polygon TopLayer 0.1 43.3 68.9 43.3 -68.9 43.3 -68.9 -43.3 -68.9 -43.3 -68.9 -43.3 68.9 -43.3 68.9 43.3 68.9))
+    )
+    (padstack pff56aeadccf7c11e2
+      (shape(polygon TopLayer 0.1 -43.3 21.65 43.3 21.65 43.3 21.65 43.3 -21.65 43.3 -21.65 -43.3 -21.65 -43.3 -21.65 -43.3 21.65))
+    )
+  )
+  (network
+    (net $PR1_3
+      (pins u1-5014b3b9c847f4747 u1-dd26d010d3da0f933 u1-b7049f2a5688d88e14)
+    )
+    (net $PR1_1
+      (pins u1-dd26d010d3da0f932 u1-b7049f2a5688d88e15 u1-87767f3fc263165e12 u1-ff56aeadccf7c11e1)
+    )
+    (net $H1_3
+      (pins u1-87767f3fc263165e11 u1-ff56aeadccf7c11e3)
+    )
+    (net $H1_4
+      (pins u1-87767f3fc263165e10 u1-ff56aeadccf7c11e4)
+    )
+    (net $H1_1
+      (pins u1-87767f3fc263165e13 u1-ff56aeadccf7c11e2)
+    )
+    (net $PR1_2
+      (pins u1-5014b3b9c847f4748 u1-dd26d010d3da0f931)
+    )
+    (class  ''
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+    (class $PR1_3 '$PR1_3'
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+    (class $PR1_2 '$PR1_2'
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+    (class $PR1_1 '$PR1_1'
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+    (class $H1_3 '$H1_3'
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+    (class $H1_4 '$H1_4'
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+    (class $H1_1 '$H1_1'
+      (circuit 
+        (use_via via0)
+      )
+      (rule 
+        (width 10)
+        (clearance 19.69)
+      )
+    )
+  )
+
+  (wiring
+  )
+)

@@ -124,6 +124,16 @@ export function parseDsn(content: string): BoardData {
     throw e
   }
 
+  // DSN is wrapped in (pcb ...) — unwrap
+  const sections: SExpr[] = []
+  if (root.length > 0 && root[0] === 'pcb') {
+    for (let i = 1; i < root.length; i++) {
+      if (Array.isArray(root[i])) sections.push(root[i])
+    }
+  } else {
+    sections.push(...root.filter(Array.isArray))
+  }
+
   const boardData: BoardData = {
     resolutionUnit: 'um',
     resolutionDenominator: 1,
@@ -162,7 +172,7 @@ export function parseDsn(content: string): BoardData {
   }
 
   // Parse structure section
-  const structure = findList(root, 'structure')
+  const structure = findList(sections, 'structure')
   if (structure) {
     const resolution = findList(structure, 'resolution')
     if (resolution && resolution.length >= 3) {
@@ -183,7 +193,7 @@ export function parseDsn(content: string): BoardData {
   }
 
   // Parse network section
-  const network = findList(root, 'network')
+  const network = findList(sections, 'network')
   if (network) {
     for (const item of network) {
       if (!Array.isArray(item) || item[0] !== 'net') continue
@@ -223,7 +233,7 @@ export function parseDsn(content: string): BoardData {
   }
 
   // Parse placement section
-  const placement = findList(root, 'placement')
+  const placement = findList(sections, 'placement')
   if (placement) {
     for (const item of placement) {
       if (!Array.isArray(item) || item[0] !== 'component') continue
