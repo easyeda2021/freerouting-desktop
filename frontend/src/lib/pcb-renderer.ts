@@ -177,8 +177,6 @@ export function createPcbRenderer(container: HTMLElement) {
         }
       }
 
-      // Auto-fit after layout
-      requestAnimationFrame(fitView)
     } catch (e) {
       console.error('PCB render error:', e)
     }
@@ -221,7 +219,7 @@ export function createPcbRenderer(container: HTMLElement) {
     tree.y = (tree.y || 0) + dy
   }
 
-  return { render, destroy, resize, zoomBy, panBy, getScale }
+  return { render, destroy, resize, zoomBy, panBy, getScale, fitView }
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string) {
@@ -261,8 +259,10 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
       const y2 = coords[3]
       const dx = x2 - x1
       const dy = y2 - y1
-      const length = Math.sqrt(dx * dx + dy * dy)
-      if (length === 0) {
+      const centerline = Math.sqrt(dx * dx + dy * dy)
+      // DSN path width is the pad width; total pad length includes the semicircular end caps
+      const length = centerline + width
+      if (centerline === 0) {
         // Zero-length path: render as a circle (EasyEDA/KiCad round pads)
         group.add(
           new Ellipse({

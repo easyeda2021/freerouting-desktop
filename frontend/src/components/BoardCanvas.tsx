@@ -8,6 +8,7 @@ export default function BoardCanvas() {
   const rendererRef = useRef<ReturnType<typeof createPcbRenderer> | null>(null)
   const isDragging = useRef(false)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
+  const hasFittedRef = useRef(false)
 
   useEffect(() => {
     const container = containerRef.current
@@ -96,9 +97,15 @@ export default function BoardCanvas() {
     if (state.boardData && rendererRef.current) {
       try {
         rendererRef.current.render(state.boardData, state.layerVisibility)
+        if (!hasFittedRef.current) {
+          rendererRef.current.fitView()
+          hasFittedRef.current = true
+        }
       } catch (e) {
         console.error('Render error:', e)
       }
+    } else if (!state.boardData) {
+      hasFittedRef.current = false
     }
   }, [state.boardData, state.layerVisibility])
 
