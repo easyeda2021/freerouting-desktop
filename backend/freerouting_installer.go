@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -76,7 +77,13 @@ func queryFRVersion() string {
 	if v != "" {
 		return v
 	}
-	// Fall back to reading freerouting.jar manifest or just return ""
+	// Fall back to running the binary with --version
+	if freeroutingBinPath != "" {
+		out, err := exec.Command(freeroutingBinPath, "--version").Output()
+		if err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	}
 	return ""
 }
 
@@ -253,8 +260,9 @@ func startFreeRouting() string {
 				if resp.StatusCode == http.StatusOK {
 					freeroutingMutex.Lock()
 					freeroutingStatus.Status = "ready"
+					freeroutingStatus.Version = getFreeRoutingVersionFromAPI()
 					freeroutingMutex.Unlock()
-					log.Println("FreeRouting API is ready")
+					log.Printf("FreeRouting API is ready, version: %s", freeroutingStatus.Version)
 					return
 				}
 			}

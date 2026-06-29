@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useApp } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
@@ -16,62 +17,59 @@ declare global {
 
 export default function MenuBar() {
   const { state, dispatch } = useApp()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleOpenDsn = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.dsn'
-    input.style.display = 'none'
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-      document.body.removeChild(input)
+    fileInputRef.current?.click()
+  }
 
-      try {
-        const content = await file.text()
-        if (!content) return
+  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
 
-        dispatch({ type: 'RESET' })
+    try {
+      const content = await file.text()
+      if (!content) return
 
-        const initialBoard = parseDsn(content)
-        dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
+      dispatch({ type: 'RESET' })
 
-        const session = await createSession()
-        dispatch({ type: 'SET_SESSION', sessionId: session.id })
+      const initialBoard = parseDsn(content)
+      dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
 
-        const job = await createJob(session.id)
-        dispatch({ type: 'SET_JOB', jobId: job.id })
+      const session = await createSession()
+      dispatch({ type: 'SET_SESSION', sessionId: session.id })
 
-        await uploadDsn(job.id, file.name, content)
-        await startRouting(job.id)
+      const job = await createJob(session.id)
+      dispatch({ type: 'SET_JOB', jobId: job.id })
 
-        streamLogs(job.id, (log) => {
-          dispatch({ type: 'ADD_LOG', entry: log as LogEntry })
-          const match = log.message.match(/score of ([\d.]+)/i)
-          if (match) dispatch({ type: 'SET_SCORE', score: parseFloat(match[1]) })
-        })
+      await uploadDsn(job.id, file.name, content)
+      await startRouting(job.id)
 
-        streamOutput(job.id, (base64Data) => {
-          try {
-            const sesContent = atob(base64Data)
-            const boardData = parseSes(sesContent)
-            dispatch({ type: 'SET_BOARD_DATA', data: boardData })
-          } catch { /* partial data */ }
-        })
+      streamLogs(job.id, (log) => {
+        dispatch({ type: 'ADD_LOG', entry: log as LogEntry })
+        const match = log.message.match(/score of ([\d.]+)/i)
+        if (match) dispatch({ type: 'SET_SCORE', score: parseFloat(match[1]) })
+      })
 
-        const poll = setInterval(async () => {
-          try {
-            const status = await getJobStatus(job.id)
-            dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
-            if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
-          } catch { /* ignore */ }
-        }, 2000)
-      } catch (err) {
-        dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
-      }
+      streamOutput(job.id, (base64Data) => {
+        try {
+          const sesContent = atob(base64Data)
+          const boardData = parseSes(sesContent)
+          dispatch({ type: 'SET_BOARD_DATA', data: boardData })
+        } catch { /* partial data */ }
+      })
+
+      const poll = setInterval(async () => {
+        try {
+          const status = await getJobStatus(job.id)
+          dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
+          if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
+        } catch { /* ignore */ }
+      }, 2000)
+    } catch (err) {
+      dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
     }
-    document.body.appendChild(input)
-    input.click()
   }
 
   const handleExportSes = async () => {
@@ -97,6 +95,7 @@ export default function MenuBar() {
   return (
     <div style={s.bar}>
       <div style={s.left}>
+        <input ref={fileInputRef} type="file" accept=".dsn" style={{ display: 'none' }} onChange={onFileSelected} />
         <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
           Open DSN
         </button>

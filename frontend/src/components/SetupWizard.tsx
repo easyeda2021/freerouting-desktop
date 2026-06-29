@@ -44,14 +44,8 @@ export default function SetupWizard() {
         try {
           const res = await fetch('http://127.0.0.1:9080/v1/system/status')
           if (res.ok) {
-            // Also fetch version from FR API
-            const verRes = await fetch('http://127.0.0.1:9080/v1/system/version')
-            let version = ''
-            if (verRes.ok) {
-              const verData = await verRes.json()
-              version = verData.version || ''
-            }
-            dispatch({ type: 'SET_FR_STATUS', payload: { status: 'ready', version, progress: 0 } })
+            const s = await getFreeRoutingStatus()
+            dispatch({ type: 'SET_FR_STATUS', payload: s })
             clearInterval(poll)
           }
         } catch { /* still starting */ }
