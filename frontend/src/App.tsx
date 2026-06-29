@@ -8,6 +8,13 @@ import ProgressPanel from './components/ProgressPanel'
 import LogPanel from './components/LogPanel'
 import SetupWizard from './components/SetupWizard'
 
+function mergeByKey<T>(existing: T[], incoming: T[], key: (item: T) => string): T[] {
+  const map = new Map<string, T>()
+  for (const item of existing) map.set(key(item), item)
+  for (const item of incoming) map.set(key(item), item)
+  return Array.from(map.values())
+}
+
 interface AppState {
   frStatus: 'loading' | 'not-installed' | 'ready' | 'error'
   frVersion: string | null
@@ -31,6 +38,7 @@ type Action =
   | { type: 'SET_JOB'; jobId: string }
   | { type: 'SET_JOB_STATE'; state: string; stage: string; currentPass: number }
   | { type: 'SET_BOARD_DATA'; data: BoardData }
+  | { type: 'MERGE_BOARD_DATA'; data: BoardData }
   | { type: 'ADD_LOG'; entry: LogEntry }
   | { type: 'SET_SCORE'; score: number }
   | { type: 'TOGGLE_LAYER'; layer: string }
@@ -72,6 +80,35 @@ function reducer(state: AppState, action: Action): AppState {
       const visibility: Record<string, boolean> = {}
       action.data.layers.forEach((l) => { visibility[l.name] = state.layerVisibility[l.name] ?? true })
       return { ...state, boardData: action.data, layerVisibility: visibility }
+    }
+    case 'MERGE_BOARD_DATA': {
+      if (!state.boardData) {
+        const visibility: Record<string, boolean> = {}
+        action.data.layers.forEach((l) => { visibility[l.name] = true })
+        return { ...state, boardData: action.data, layerVisibility: visibility }
+      }
+      const existing = state.boardData
+      const incoming = action.data
+
+      // Preserve original components/images/padstacks and board outline;
+      // replace network traces/vias with the routed result.
+      const merged: BoardData = {
+        resolutionUnit: incoming.resolutionUnit || existing.resolutionUnit,
+        resolutionDenominator: incoming.resolutionDenominator || existing.resolutionDenominator,
+        layers: mergeByKey(existing.layers, incoming.layers, (l) => l.name),
+        traces: [
+          ...existing.traces.filter((t) => t.netName === ''),
+          ...incoming.traces,
+        ],
+        vias: incoming.vias.length > 0 ? incoming.vias : existing.vias,
+        components: existing.components,
+        padstacks: mergeByKey(existing.padstacks, incoming.padstacks, (p) => p.name),
+        images: existing.images,
+      }
+
+      const visibility: Record<string, boolean> = {}
+      merged.layers.forEach((l) => { visibility[l.name] = state.layerVisibility[l.name] ?? true })
+      return { ...state, boardData: merged, layerVisibility: visibility }
     }
     case 'ADD_LOG':
       if (!action.entry || typeof action.entry !== 'object') return state

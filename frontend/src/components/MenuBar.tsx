@@ -60,7 +60,7 @@ export default function MenuBar() {
         sesBuffer += base64
         const sesContent = atob(sesBuffer)
         const boardData = parseSes(sesContent)
-        dispatch({ type: 'SET_BOARD_DATA', data: boardData })
+        dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
         sesBuffer = ''
       } catch {
         // Keep buffer for next chunk if this one is partial
@@ -78,7 +78,7 @@ export default function MenuBar() {
             const output = await getJobOutput(job.id)
             const sesContent = atob(output.data)
             const boardData = parseSes(sesContent)
-            dispatch({ type: 'SET_BOARD_DATA', data: boardData })
+            dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
           } catch (err) {
             console.error('Failed to fetch final SES output:', err)
           }

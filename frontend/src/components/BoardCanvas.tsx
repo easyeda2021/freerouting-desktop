@@ -6,6 +6,8 @@ export default function BoardCanvas() {
   const { state } = useApp()
   const containerRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<ReturnType<typeof createPcbRenderer> | null>(null)
+  const isDragging = useRef(false)
+  const lastPos = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -34,13 +36,40 @@ export default function BoardCanvas() {
       else rendererRef.current?.panBy(0, -step)
     }
 
-    const handleMouseDown = () => container.focus()
+    const handleMouseDown = (e: MouseEvent) => {
+      container.focus()
+      if (e.button === 0 || e.button === 2) {
+        isDragging.current = true
+        lastPos.current = { x: e.clientX, y: e.clientY }
+        e.preventDefault()
+      }
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !lastPos.current) return
+      const dx = e.clientX - lastPos.current.x
+      const dy = e.clientY - lastPos.current.y
+      lastPos.current = { x: e.clientX, y: e.clientY }
+      rendererRef.current?.panBy(dx, dy)
+    }
+
+    const handleMouseUp = () => {
+      isDragging.current = false
+      lastPos.current = null
+    }
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+    }
 
     window.addEventListener('resize', handleResize)
     document.addEventListener('fullscreenchange', handleResize)
     container.addEventListener('wheel', handleWheel, { passive: false })
     container.addEventListener('keydown', handleKeyDown)
     container.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    container.addEventListener('contextmenu', handleContextMenu)
 
     return () => {
       window.removeEventListener('resize', handleResize)
@@ -48,6 +77,9 @@ export default function BoardCanvas() {
       container.removeEventListener('wheel', handleWheel)
       container.removeEventListener('keydown', handleKeyDown)
       container.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      container.removeEventListener('contextmenu', handleContextMenu)
       rendererRef.current?.destroy()
     }
   }, [])
