@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -72,19 +71,7 @@ done:
 }
 
 func queryFRVersion() string {
-	// Try API first (FR is already running)
-	v := getFreeRoutingVersionFromAPI()
-	if v != "" {
-		return v
-	}
-	// Fall back to running the binary with --version
-	if freeroutingBinPath != "" {
-		out, err := exec.Command(freeroutingBinPath, "--version").Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
-		}
-	}
-	return ""
+	return getFreeRoutingVersionFromAPI()
 }
 
 func loadConfig() Config {
@@ -124,7 +111,7 @@ func saveLastDir(dir string) {
 }
 
 func getFreeRoutingVersionFromAPI() string {
-	resp, err := http.Get("http://127.0.0.1:37864/v1/system/version")
+	resp, err := http.Get("http://127.0.0.1:37864/v1/system/status")
 	if err != nil {
 		return ""
 	}
@@ -134,8 +121,11 @@ func getFreeRoutingVersionFromAPI() string {
 	if err := json.Unmarshal(body, &result); err != nil {
 		return ""
 	}
-	if v, ok := result["version"]; ok {
-		return fmt.Sprintf("%v", v)
+	// Try common version field names
+	for _, key := range []string{"version", "Version", "freerouting_version", "application_version", "build_version"} {
+		if v, ok := result[key]; ok {
+			return fmt.Sprintf("%v", v)
+		}
 	}
 	return ""
 }
