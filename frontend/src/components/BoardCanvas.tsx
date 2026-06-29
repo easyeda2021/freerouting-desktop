@@ -15,7 +15,11 @@ export default function BoardCanvas() {
 
   useEffect(() => {
     if (state.boardData && rendererRef.current) {
-      rendererRef.current.render(state.boardData, state.layerVisibility)
+      try {
+        rendererRef.current.render(state.boardData, state.layerVisibility)
+      } catch (e) {
+        console.error('Render error:', e)
+      }
     }
   }, [state.boardData, state.layerVisibility])
 

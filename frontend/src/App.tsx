@@ -2,6 +2,7 @@ import { createContext, useContext, useReducer, type Dispatch } from 'react'
 import type { BoardData, LogEntry, FRStatusData } from './lib/board-types'
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
+import ErrorBoundary from './components/ErrorBoundary'
 import SidePanel from './components/SidePanel'
 import ProgressPanel from './components/ProgressPanel'
 import LogPanel from './components/LogPanel'
@@ -102,7 +103,9 @@ export default function App() {
         <MenuBar />
         <div style={styles.main}>
           <div style={styles.canvasArea}>
-            <BoardCanvas />
+            <ErrorBoundary>
+              <BoardCanvas />
+            </ErrorBoundary>
             <ProgressPanel />
             <LogPanel />
           </div>

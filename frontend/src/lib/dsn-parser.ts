@@ -114,19 +114,23 @@ function findList(items: SExpr[], keyword: string): SExpr[] | null {
 }
 
 export function parseDsn(content: string): BoardData {
-  const tokens = tokenize(content)
-  const pos = { i: 0 }
-  let root: SExpr[]
   try {
-    root = parseList(tokens, pos)
-  } catch (e) {
-    console.error('DSN parse error:', e)
-    throw e
-  }
+    const tokens = tokenize(content)
+    const pos = { i: 0 }
+    let root: SExpr
+    try {
+      root = parseList(tokens, pos)
+    } catch (e) {
+      console.error('DSN token parse error:', e)
+      return emptyBoard()
+    }
 
-  // DSN is wrapped in (pcb ...) — unwrap
+    // DSN is wrapped in (PCB ...) or (pcb ...) — unwrap
+
+  // DSN is wrapped in (PCB ...) or (pcb ...) — unwrap
   const sections: SExpr[] = []
-  if (root.length > 0 && root[0] === 'pcb') {
+  const rootName = String(root[0]).toLowerCase()
+  if (rootName === 'pcb') {
     for (let i = 1; i < root.length; i++) {
       if (Array.isArray(root[i])) sections.push(root[i])
     }
@@ -145,11 +149,12 @@ export function parseDsn(content: string): BoardData {
   }
 
   const layerSet = new Set<string>()
-  let denom = 1
 
+  // EasyEDA DSN files declare (resolution mil 1000) but output float values
+  // already in mils.
   function addPath(pathList: SExpr[], netName: string) {
     const layer = String(pathList[1])
-    const width = Number(pathList[2]) / denom
+    const width = Number(pathList[2])
     layerSet.add(layer)
     const corners: [number, number][] = []
 
@@ -158,17 +163,24 @@ export function parseDsn(content: string): BoardData {
       for (; i < pathList.length; i++) {
         if (Array.isArray(pathList[i]) && (pathList[i] as SExpr[])[0] === 'pt') {
           const pt = pathList[i] as SExpr[]
-          corners.push([Number(pt[1]) / denom, Number(pt[2]) / denom])
+          corners.push([Number(pt[1]), Number(pt[2])])
         }
       }
     } else {
       for (; i < pathList.length - 1; i += 2) {
-        corners.push([Number(pathList[i]) / denom, Number(pathList[i + 1]) / denom])
+        corners.push([Number(pathList[i]), Number(pathList[i + 1])])
       }
     }
     if (corners.length >= 2) {
       boardData.traces.push({ netName, layer, width, corners })
     }
+  }
+
+  // Parse resolution (may be at PCB level or inside structure)
+  const pcbResolution = findList(sections, 'resolution')
+  if (pcbResolution && pcbResolution.length >= 3) {
+    boardData.resolutionUnit = String(pcbResolution[1])
+    boardData.resolutionDenominator = Number(pcbResolution[2])
   }
 
   // Parse structure section
@@ -178,15 +190,32 @@ export function parseDsn(content: string): BoardData {
     if (resolution && resolution.length >= 3) {
       boardData.resolutionUnit = String(resolution[1])
       boardData.resolutionDenominator = Number(resolution[2])
-      denom = boardData.resolutionDenominator || 1
     }
 
-    const layerList = findList(structure, 'layer')
-    if (layerList) {
-      for (let i = 1; i < layerList.length; i++) {
-        const item = layerList[i]
-        if (Array.isArray(item) && item.length >= 1) {
-          layerSet.add(String(item[0]))
+    // Parse layer definitions — structure may contain multiple (layer ...) entries
+    for (const item of structure) {
+      if (Array.isArray(item) && item.length >= 2 && item[0] === 'layer') {
+        layerSet.add(String(item[1]))
+      }
+    }
+
+    // Parse board boundary (outline)
+    const boundary = findList(structure, 'boundary')
+    if (boundary) {
+      for (const bItem of boundary) {
+        if (Array.isArray(bItem) && bItem.length >= 2 && (bItem[0] === 'path' || bItem[0] === 'wire')) {
+          const coords: [number, number][] = []
+          for (let i = 2; i < bItem.length - 1; i += 2) {
+            coords.push([Number(bItem[i]), Number(bItem[i + 1])])
+          }
+          if (coords.length >= 2) {
+            boardData.traces.push({
+              netName: '',
+              layer: String(bItem[1]),
+              width: 0.5,
+              corners: coords,
+            })
+          }
         }
       }
     }
@@ -220,11 +249,11 @@ export function parseDsn(content: string): BoardData {
           const via: ViaData = {
             netName,
             padstackName: String(sub[1]),
-            center: [Number(sub[2]) / denom, Number(sub[3]) / denom],
-            diameter: 30 / denom,
+            center: [Number(sub[2]), Number(sub[3])],
+            diameter: 30,
           }
           if (sub[4] !== undefined && typeof sub[4] === 'number') {
-            via.diameter = Number(sub[4]) / denom
+            via.diameter = Number(sub[4])
           }
           boardData.vias.push(via)
         }
@@ -242,7 +271,7 @@ export function parseDsn(content: string): BoardData {
         boardData.components.push({
           refdes: String(sub[1]),
           package: String(item[1]),
-          location: [Number(sub[2]) / denom, Number(sub[3]) / denom],
+          location: [Number(sub[2]), Number(sub[3])],
           side: String(sub[4]).toLowerCase() === 'back' ? 'back' : 'front',
           rotation: Number(sub[5]) || 0,
         })
@@ -253,4 +282,12 @@ export function parseDsn(content: string): BoardData {
   boardData.layers = Array.from(layerSet).map((name, index) => ({ name, index }))
 
   return boardData
+  } catch (e) {
+    console.error('DSN parse error:', e)
+    return emptyBoard()
+  }
+}
+
+function emptyBoard(): BoardData {
+  return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [] }
 }
