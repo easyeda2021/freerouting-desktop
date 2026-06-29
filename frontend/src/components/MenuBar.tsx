@@ -62,13 +62,29 @@ export default function MenuBar() {
         sesBuffer += base64
         const sesContent = atob(sesBuffer)
         const boardData = parseSes(sesContent)
+        console.log(`[streamOutput] parsed ${boardData.traces.length} traces, ${boardData.vias.length} vias`)
         scheduleMerge(boardData)
         sesBuffer = ''
-      } catch {
+      } catch (err) {
+        console.log('[streamOutput] incomplete chunk, accumulating...', err)
         if (sesBuffer.length > 5_000_000) sesBuffer = ''
       }
     })
 
+    const fetchAndMergeOutput = async (label: string) => {
+      try {
+        const output = await getJobOutput(jobId)
+        if (!output.data) return
+        const sesContent = atob(output.data)
+        const boardData = parseSes(sesContent)
+        console.log(`[${label}] fetched ${boardData.traces.length} traces, ${boardData.vias.length} vias`)
+        dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
+      } catch (err) {
+        console.error(`[${label}] failed to fetch/parse output:`, err)
+      }
+    }
+
+    // Poll job status every 2s; fetch final output immediately when completed
     const poll = setInterval(async () => {
       try {
         const status = await getJobStatus(jobId)
@@ -79,19 +95,21 @@ export default function MenuBar() {
             clearTimeout(mergeTimerRef.current)
             flushMerge()
           }
-          try {
-            const output = await getJobOutput(jobId)
-            const sesContent = atob(output.data)
-            const boardData = parseSes(sesContent)
-            dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
-            log('Info', 'Final routing output merged')
-          } catch (err) {
-            console.error('Failed to fetch final SES output:', err)
-          }
+          await fetchAndMergeOutput('finalOutput')
+          log('Info', 'Final routing output merged')
         }
-        if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
+        if (status.state === 'COMPLETED' || status.state === 'CANCELLED') {
+          clearInterval(poll)
+          clearInterval(outputPoll)
+        }
       } catch { /* ignore */ }
     }, 2000)
+
+    // Poll routing output every 5s during routing to refresh canvas progress
+    const outputPoll = setInterval(async () => {
+      if (outputFetchedRef.current) return
+      await fetchAndMergeOutput('periodicOutput')
+    }, 5000)
   }
 
   const loadDsnFromContent = async (content: string, fileName: string) => {
