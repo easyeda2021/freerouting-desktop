@@ -26,7 +26,11 @@ export function createPcbRenderer(container: HTMLElement) {
 
   function resize() {
     ;(app as any).resize?.()
-    fitView()
+    // Wait a frame so the canvas/view bounds reflect the new container size
+    requestAnimationFrame(() => {
+      ;(app as any).resize?.()
+      fitView()
+    })
   }
 
   function fitView() {

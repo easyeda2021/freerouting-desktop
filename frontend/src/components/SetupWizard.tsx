@@ -42,9 +42,8 @@ export default function SetupWizard() {
     } else {
       const poll = setInterval(async () => {
         try {
-          const res = await fetch('http://127.0.0.1:9080/v1/system/status')
-          if (res.ok) {
-            const s = await getFreeRoutingStatus()
+          const s = await getFreeRoutingStatus()
+          if (s.status === 'ready') {
             dispatch({ type: 'SET_FR_STATUS', payload: s })
             clearInterval(poll)
           }

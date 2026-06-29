@@ -17,8 +17,14 @@ export default function BoardCanvas() {
 
     const handleResize = () => {
       // Delay slightly so container has finished layout
-      setTimeout(() => rendererRef.current?.resize(), 50)
+      setTimeout(() => rendererRef.current?.resize(), 100)
     }
+
+    const resizeObserver = new ResizeObserver(() => {
+      // ResizeObserver fires when the container size actually changes;
+      // this catches maximize/minimize more reliably than window.resize.
+      setTimeout(() => rendererRef.current?.resize(), 100)
+    })
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -64,6 +70,7 @@ export default function BoardCanvas() {
 
     window.addEventListener('resize', handleResize)
     document.addEventListener('fullscreenchange', handleResize)
+    resizeObserver.observe(container)
     container.addEventListener('wheel', handleWheel, { passive: false })
     container.addEventListener('keydown', handleKeyDown)
     container.addEventListener('mousedown', handleMouseDown)
@@ -74,6 +81,7 @@ export default function BoardCanvas() {
     return () => {
       window.removeEventListener('resize', handleResize)
       document.removeEventListener('fullscreenchange', handleResize)
+      resizeObserver.disconnect()
       container.removeEventListener('wheel', handleWheel)
       container.removeEventListener('keydown', handleKeyDown)
       container.removeEventListener('mousedown', handleMouseDown)

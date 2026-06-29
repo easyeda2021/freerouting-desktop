@@ -127,11 +127,20 @@ func saveConfig(cfg Config) error {
 		log.Printf("Failed to write config temp file: %v", err)
 		return err
 	}
-	if err := os.Rename(tmpPath, getConfigPath()); err != nil {
+	if err := renameWithOverwrite(tmpPath, getConfigPath()); err != nil {
 		log.Printf("Failed to rename config temp file: %v", err)
 		return err
 	}
 	return nil
+}
+
+func renameWithOverwrite(src, dst string) error {
+	if runtime.GOOS == "windows" {
+		if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return os.Rename(src, dst)
 }
 
 func loadFreeRoutingPath() string {

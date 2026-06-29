@@ -74,8 +74,9 @@ func main() {
 	defer w.Destroy()
 
 	w.SetTitle("FreeRouting Desktop " + version)
-	w.SetSize(1600, 1000, webview.HintNone)
-	centerWindow(w)
+	winW, winH := initialWindowSize()
+	w.SetSize(winW, winH, webview.HintNone)
+	centerWindow(winW, winH)
 
 	w.Bind("checkFreeRoutingStatus", checkFreeRoutingStatus)
 	w.Bind("selectFreeRoutingPath", selectFreeRoutingPath)
@@ -98,7 +99,25 @@ func main() {
 	log.Println("Exited.")
 }
 
-func centerWindow(w webview.WebView) {
+func initialWindowSize() (int, int) {
+	sw, sh := screenSize()
+	w := int(float64(sw) * 0.8)
+	h := int(float64(sh) * 0.8)
+	if w < 1024 { w = 1024 }
+	if h < 768 { h = 768 }
+	return w, h
+}
+
+func screenSize() (int, int) {
+	if runtime.GOOS == "windows" {
+		sw, _, _ := procGetSystemMetrics.Call(0) // SM_CXSCREEN = 0
+		sh, _, _ := procGetSystemMetrics.Call(1) // SM_CYSCREEN = 1
+		return int(sw), int(sh)
+	}
+	return 1600, 1000
+}
+
+func centerWindow(width, height int) {
 	if runtime.GOOS != "windows" {
 		return
 	}
@@ -111,7 +130,7 @@ func centerWindow(w webview.WebView) {
 			if hwnd == 0 {
 				continue
 			}
-			setWindowCenter(hwnd, 1600, 1000)
+			setWindowCenter(hwnd, width, height)
 			return
 		}
 	}()
