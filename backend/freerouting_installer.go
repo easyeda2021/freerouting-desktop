@@ -32,6 +32,7 @@ var (
 	freeroutingMutex    sync.Mutex
 	freeroutingStatus   = FreeRoutingStatus{Status: "loading"}
 	freeroutingBinPath  string
+	configMutex         sync.Mutex
 )
 
 func getFreeRoutingDir() string {
@@ -40,7 +41,25 @@ func getFreeRoutingDir() string {
 }
 
 func getConfigPath() string {
+	return filepath.Join(getFreeRoutingDir(), "config.json")
+}
+
+func getLegacyConfigPath() string {
 	return filepath.Join(getFreeRoutingDir(), "config.cfg")
+}
+
+func migrateConfig() {
+	newPath := getConfigPath()
+	oldPath := getLegacyConfigPath()
+	if _, err := os.Stat(newPath); os.IsNotExist(err) {
+		if _, err := os.Stat(oldPath); err == nil {
+			if err := os.Rename(oldPath, newPath); err != nil {
+				log.Printf("Failed to migrate old config.cfg to config.json: %v", err)
+			} else {
+				log.Printf("Migrated config.cfg to config.json")
+			}
+		}
+	}
 }
 
 func checkFreeRoutingStatus() string {
@@ -75,19 +94,44 @@ func queryFRVersion() string {
 }
 
 func loadConfig() Config {
+	migrateConfig()
 	var cfg Config
 	data, err := os.ReadFile(getConfigPath())
 	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("Failed to read config: %v", err)
+		}
 		return cfg
 	}
-	json.Unmarshal(data, &cfg)
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		log.Printf("Failed to parse config: %v", err)
+	}
 	return cfg
 }
 
-func saveConfig(cfg Config) {
-	os.MkdirAll(getFreeRoutingDir(), 0755)
-	data, _ := json.MarshalIndent(cfg, "", "  ")
-	os.WriteFile(getConfigPath(), data, 0644)
+func saveConfig(cfg Config) error {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+	if err := os.MkdirAll(getFreeRoutingDir(), 0755); err != nil {
+		log.Printf("Failed to create config dir: %v", err)
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal config: %v", err)
+		return err
+	}
+	// Write to temp file and rename for atomicity
+	tmpPath := getConfigPath() + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		log.Printf("Failed to write config temp file: %v", err)
+		return err
+	}
+	if err := os.Rename(tmpPath, getConfigPath()); err != nil {
+		log.Printf("Failed to rename config temp file: %v", err)
+		return err
+	}
+	return nil
 }
 
 func loadFreeRoutingPath() string {
