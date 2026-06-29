@@ -35,6 +35,14 @@ windows: backend/dist backend/rsrc_windows_amd64.syso bump-version
 		-o $(ROOT)build/$(BINARY)-$(VERSION)-windows-x64.exe .
 	@echo "Build: $(BINARY)-$(VERSION)-windows-x64.exe"
 
+# CI-friendly Windows build; does not bump VERSION.
+ci-windows: backend/dist backend/rsrc_windows_amd64.syso
+	cd $(ROOT)backend && \
+		GOOS=windows GOARCH=amd64 CGO_ENABLED=1 \
+		go build -ldflags="-s -w -H windowsgui -X main.version=$(VERSION) -X main.platform=windows" \
+		-o $(ROOT)build/$(BINARY)-$(VERSION)-windows-x64.exe .
+	@echo "Build: $(BINARY)-$(VERSION)-windows-x64.exe"
+
 macos: backend/dist
 	cd $(ROOT)backend && \
 		GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
