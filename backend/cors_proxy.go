@@ -14,8 +14,8 @@ func startCORSProxy() {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
@@ -30,7 +30,7 @@ func startCORSProxy() {
 	})
 
 	log.Println("CORS proxy listening on :9080 -> :37864")
-	if err := http.ListenAndServe("127.0.0.1:9080", nil); err != nil {
+	if err := http.ListenAndServe("127.0.0.1:9080", mux); err != nil {
 		log.Printf("CORS proxy error: %v", err)
 	}
 }

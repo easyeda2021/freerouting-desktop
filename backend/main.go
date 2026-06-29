@@ -2,11 +2,13 @@ package main
 
 import (
 	"embed"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -22,8 +24,23 @@ var (
 )
 
 func main() {
-	logFile, _ := os.Create(getFRDir() + "/app.log")
-	log.SetOutput(logFile)
+	home, _ := os.UserHomeDir()
+	logPath := home + "/freerouting-desktop.log"
+	logFile, _ := os.Create(logPath)
+	writers := []io.Writer{os.Stderr}
+	if logFile != nil {
+		writers = append(writers, logFile)
+	}
+	log.SetOutput(io.MultiWriter(writers...))
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("PANIC: %v\n%s", r, debug.Stack())
+		}
+		if logFile != nil {
+			logFile.Close()
+		}
+	}()
+
 	log.SetFlags(log.Ltime)
 	log.Printf("FreeRouting Desktop %s (%s)", version, platform)
 
@@ -37,19 +54,21 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// Verify embed works
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
 		log.Printf("embed error: %v", err)
-		// List embedded files for debugging
-		fs.WalkDir(dist, ".", func(path string, d os.DirEntry, err error) error {
-			log.Printf("  embed: %s", path)
-			return nil
-		})
 		return
 	}
+	log.Println("Embed OK, starting HTTP...")
+
+	fmux := http.NewServeMux()
+	fmux.Handle("/", http.FileServer(http.FS(sub)))
+	go http.ListenAndServe("127.0.0.1:1421", fmux)
+	time.Sleep(100 * time.Millisecond)
+	log.Println("HTTP server started, creating WebView...")
 
 	w := webview.New(false)
+	log.Println("WebView created")
 	defer w.Destroy()
 
 	w.SetTitle("FreeRouting Desktop " + version)
@@ -66,22 +85,14 @@ func main() {
 
 	devMode := os.Getenv("FR_DEV") == "1"
 	if devMode {
-		log.Println("Dev mode: loading from http://localhost:1420")
+		log.Println("Dev: http://localhost:1420")
 		w.Navigate("http://localhost:1420")
 	} else {
-		http.Handle("/", http.FileServer(http.FS(sub)))
-		ready := make(chan struct{})
-		go func() {
-			ready <- struct{}{}
-			if err := http.ListenAndServe("127.0.0.1:1421", nil); err != nil {
-				log.Printf("HTTP server: %v", err)
-			}
-		}()
-		<-ready
-		time.Sleep(50 * time.Millisecond) // let the listener bind
-		log.Println("Prod mode: serving embedded dist on :1421")
+		log.Println("Prod: http://127.0.0.1:1421")
 		w.Navigate("http://127.0.0.1:1421")
 	}
 
+	log.Println("Calling w.Run()...")
 	w.Run()
+	log.Println("Exited.")
 }
