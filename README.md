@@ -28,6 +28,8 @@ Go Host (WebView + FR Installer + CORS Proxy)
 
 FreeRouting packages bundle their own JRE — users never need to install Java.
 
+> The table above lists the **FreeRouting** package format that the Go host downloads when FreeRouting is not already installed. FreeRouting Desktop itself is shipped as a single executable (`freerouting-desktop.exe` on Windows).
+
 ## Development
 
 ### Prerequisites
