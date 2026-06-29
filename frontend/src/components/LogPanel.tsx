@@ -15,9 +15,9 @@ export default function LogPanel() {
     <div ref={ref} style={s.panel}>
       {state.logEntries.map((entry, i) => (
         <div key={i} style={{ ...s.line, color: entry.type === 'Error' ? '#e94560' : entry.type === 'Warn' ? '#f5a623' : '#888' }}>
-          <span style={s.time}>{entry.timestamp.slice(11, 19)}</span>
-          <span style={s.type}>{entry.type.padEnd(5)}</span>
-          {entry.message}
+          <span style={s.time}>{entry.timestamp ? entry.timestamp.slice(11, 19) : '--:--:--'}</span>
+          <span style={s.type}>{entry.type ? entry.type.padEnd(5) : ''}</span>
+          {entry.message ?? ''}
         </div>
       ))}
       {state.logEntries.length === 0 && <div style={s.empty}>Log output will appear here...</div>}

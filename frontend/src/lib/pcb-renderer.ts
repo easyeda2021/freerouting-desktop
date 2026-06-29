@@ -18,6 +18,7 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   function render(data: BoardData, visibility: Record<string, boolean>) {
+    try {
     clear()
     app.tree.clear()
 
@@ -58,6 +59,7 @@ export function createPcbRenderer(container: HTMLElement) {
 
     // Auto-fit on first render
     app.tree.zoom('fit')
+    } catch (e) { console.error('PCB render error:', e) }
   }
 
   function destroy() {

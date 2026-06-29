@@ -104,8 +104,9 @@ type SExpr = string | number | SExpr[]
 // ===== Proper recursive descent =====
 
 export function parseSes(content: string): BoardData {
-  const tokens = tokenize(content)
-  let pos = 0
+  try {
+    const tokens = tokenize(content)
+    let pos = 0
 
   function peek(): Token | null {
     return pos < tokens.length ? tokens[pos] : null
@@ -274,6 +275,10 @@ export function parseSes(content: string): BoardData {
   boardData.layers = Array.from(layerSet).map((name, index) => ({ name, index }))
 
   return boardData
+  } catch (e) {
+    console.error('SES parse error:', e)
+    return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [] }
+  }
 }
 
 function tokenize(input: string): Token[] {

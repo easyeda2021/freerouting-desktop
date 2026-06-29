@@ -101,16 +101,16 @@ export default function App() {
       <div style={styles.container}>
         {state.frStatus !== 'ready' && <SetupWizard />}
         <MenuBar />
-        <div style={styles.main}>
-          <div style={styles.canvasArea}>
-            <ErrorBoundary>
+        <ErrorBoundary>
+          <div style={styles.main}>
+            <div style={styles.canvasArea}>
               <BoardCanvas />
-            </ErrorBoundary>
-            <ProgressPanel />
-            <LogPanel />
+              <ProgressPanel />
+              <LogPanel />
+            </div>
+            <SidePanel />
           </div>
-          <SidePanel />
-        </div>
+        </ErrorBoundary>
       </div>
     </AppContext.Provider>
   )
