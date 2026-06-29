@@ -51,7 +51,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: cd frontend && npm ci
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify frontend toolchain
+        working-directory: frontend
+        run: npx tsc --version
 
       - name: Install Python dependencies
         run: pip install pillow
