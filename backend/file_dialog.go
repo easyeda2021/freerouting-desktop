@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -17,6 +16,17 @@ func openNativeFileDialog() (string, error) {
 		return openFileDialogMacOS()
 	default:
 		return openFileDialogLinux()
+	}
+}
+
+func openExecutableDialog() (string, error) {
+	switch runtime.GOOS {
+	case "windows":
+		return openExecutableDialogWindows()
+	case "darwin":
+		return openExecutableDialogMacOS()
+	default:
+		return openExecutableDialogLinux()
 	}
 }
 
@@ -33,15 +43,26 @@ func saveNativeFileDialog(defaultName string) (string, error) {
 
 // Windows: use PowerShell to show file dialog
 func openFileDialogWindows() (string, error) {
-	script := `
-	Add-Type -AssemblyName System.Windows.Forms
-	$dialog = New-Object System.Windows.Forms.OpenFileDialog
-	$dialog.Filter = "DSN Files (*.dsn)|*.dsn|SES Files (*.ses)|*.ses|All Files (*.*)|*.*"
-	$dialog.Title = "Open Design File"
-	if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-		$dialog.FileName
-	}
-	`
+	return fileDialogWindows("DSN Files (*.dsn)|*.dsn|SES Files (*.ses)|*.ses|All Files (*.*)|*.*", "Open Design File")
+}
+
+func openExecutableDialogWindows() (string, error) {
+	return fileDialogWindows("Executable (*.exe)|*.exe|All Files (*.*)|*.*", "Select FreeRouting Executable")
+}
+
+func fileDialogWindows(filter, title string) (string, error) {
+	script := fmt.Sprintf(`
+Add-Type -AssemblyName System.Windows.Forms
+$form = New-Object System.Windows.Forms.Form
+$form.TopMost = $true
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Filter = "%s"
+$dialog.Title = "%s"
+if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
+	$dialog.FileName
+}
+$form.Dispose()
+`, filter, title)
 	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).Output()
 	if err != nil {
 		return "", err
@@ -51,15 +72,18 @@ func openFileDialogWindows() (string, error) {
 
 func saveFileDialogWindows(defaultName string) (string, error) {
 	script := fmt.Sprintf(`
-	Add-Type -AssemblyName System.Windows.Forms
-	$dialog = New-Object System.Windows.Forms.SaveFileDialog
-	$dialog.Filter = "SES Files (*.ses)|*.ses|All Files (*.*)|*.*"
-	$dialog.FileName = "%s"
-	$dialog.Title = "Save SES File"
-	if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-		$dialog.FileName
-	}
-	`, defaultName)
+Add-Type -AssemblyName System.Windows.Forms
+$form = New-Object System.Windows.Forms.Form
+$form.TopMost = $true
+$dialog = New-Object System.Windows.Forms.SaveFileDialog
+$dialog.Filter = "SES Files (*.ses)|*.ses|All Files (*.*)|*.*"
+$dialog.FileName = "%s"
+$dialog.Title = "Save SES File"
+if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
+	$dialog.FileName
+}
+$form.Dispose()
+`, defaultName)
 	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).Output()
 	if err != nil {
 		return "", err
@@ -77,6 +101,14 @@ func openFileDialogMacOS() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+func openExecutableDialogMacOS() (string, error) {
+	out, err := exec.Command("sh", "-c", `osascript -e 'POSIX path of (choose file)'`).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 func saveFileDialogMacOS(defaultName string) (string, error) {
 	script := fmt.Sprintf(`osascript -e 'POSIX path of (choose file name default name "%s")'`, defaultName)
 	out, err := exec.Command("sh", "-c", script).Output()
@@ -88,6 +120,14 @@ func saveFileDialogMacOS(defaultName string) (string, error) {
 
 // Linux: use zenity or kdialog
 func openFileDialogLinux() (string, error) {
+	return fileDialogLinux("*.dsn *.ses")
+}
+
+func openExecutableDialogLinux() (string, error) {
+	return fileDialogLinux("")
+}
+
+func fileDialogLinux(fileFilter string) (string, error) {
 	dialog := "zenity"
 	if _, err := exec.LookPath("zenity"); err != nil {
 		if _, err := exec.LookPath("kdialog"); err == nil {
@@ -97,13 +137,22 @@ func openFileDialogLinux() (string, error) {
 		}
 	}
 	if dialog == "zenity" {
-		out, err := exec.Command("zenity", "--file-selection", "--file-filter=*.dsn *.ses").Output()
+		args := []string{"--file-selection"}
+		if fileFilter != "" {
+			args = append(args, "--file-filter", fileFilter)
+		}
+		out, err := exec.Command("zenity", args...).Output()
 		if err != nil {
 			return "", err
 		}
 		return strings.TrimSpace(string(out)), nil
 	}
-	out, err := exec.Command("kdialog", "--getopenfilename", ".", "*.dsn *.ses").Output()
+	// kdialog
+	filter := "*"
+	if fileFilter != "" {
+		filter = fileFilter
+	}
+	out, err := exec.Command("kdialog", "--getopenfilename", ".", filter).Output()
 	if err != nil {
 		return "", err
 	}
@@ -135,8 +184,7 @@ func saveFileDialogLinux(defaultName string) (string, error) {
 
 // Ensure the app data directory exists
 func init() {
-	os.MkdirAll(getFRDir(), 0755)
-	os.MkdirAll(filepath.Join(getFRDir(), "downloads"), 0755)
+	os.MkdirAll(getFreeRoutingDir(), 0755)
 }
 
 // Public wrappers bound to JS
@@ -171,4 +219,15 @@ func writeFile(path string, data string) string {
 		return err.Error()
 	}
 	return ""
+}
+
+func openURL(url string) {
+	switch runtime.GOOS {
+	case "windows":
+		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		exec.Command("open", url).Start()
+	default:
+		exec.Command("xdg-open", url).Start()
+	}
 }

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useApp } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
@@ -5,11 +6,11 @@ import type { LogEntry } from '../lib/board-types'
 
 declare global {
   interface Window {
-    checkFRStatus: () => string
-    downloadFR: () => void
-    startFR: () => string
-    stopFR: () => void
-    openFileDialog: () => string
+    checkFreeRoutingStatus: () => string
+    selectFreeRoutingPath: () => string
+    startFreeRouting: () => string
+    stopFreeRouting: () => void
+    openURL: (url: string) => void
     saveFileDialog: (name: string) => string
     readFile: (path: string) => string
     writeFile: (path: string, data: string) => string
@@ -18,13 +19,18 @@ declare global {
 
 export default function MenuBar() {
   const { state, dispatch } = useApp()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleOpenDsn = async () => {
-    try {
-      const path = window.openFileDialog()
-      if (!path) return
+    fileInputRef.current?.click()
+  }
 
-      const content = window.readFile(path)
+  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = '' // allow re-selecting the same file
+    try {
+      const content = await file.text()
       if (!content) return
 
       const session = await createSession()
@@ -33,7 +39,7 @@ export default function MenuBar() {
       const job = await createJob(session.id)
       dispatch({ type: 'SET_JOB', jobId: job.id })
 
-      await uploadDsn(job.id, path.split(/[\\/]/).pop() || 'design.dsn', content)
+      await uploadDsn(job.id, file.name, content)
       await startRouting(job.id)
 
       streamLogs(job.id, (log) => {
@@ -67,8 +73,8 @@ export default function MenuBar() {
     try {
       const output = await getJobOutput(state.jobId)
       const sesContent = atob(output.data)
-      const path = window.saveFileDialog(output.filename || 'output.ses')
-      if (path) window.writeFile(path, sesContent)
+      const path = await window.saveFileDialog(output.filename || 'output.ses')
+      if (path) await window.writeFile(path, sesContent)
     } catch (err) {
       dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
     }
@@ -78,6 +84,7 @@ export default function MenuBar() {
     <div style={s.bar}>
       <span style={s.brand}>FreeRouting Desktop</span>
       <div style={s.menu}>
+        <input ref={fileInputRef} type="file" accept=".dsn" style={{ display: 'none' }} onChange={onFileSelected} />
         <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
           Open DSN
         </button>

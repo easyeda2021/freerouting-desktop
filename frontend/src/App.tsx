@@ -8,7 +8,7 @@ import LogPanel from './components/LogPanel'
 import SetupWizard from './components/SetupWizard'
 
 interface AppState {
-  frStatus: 'loading' | 'not-installed' | 'downloading' | 'installing' | 'ready' | 'error'
+  frStatus: 'loading' | 'not-installed' | 'ready' | 'error'
   frVersion: string | null
   downloadProgress: number
   sessionId: string | null

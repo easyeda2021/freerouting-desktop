@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../App'
 
-// ponytail: Go w.Bind() returns Promise in JS, must await
-async function getFRStatus() {
-  const raw = await window.checkFRStatus()
+async function getFreeRoutingStatus() {
+  const raw = await window.checkFreeRoutingStatus()
   return JSON.parse(raw)
 }
 
@@ -13,34 +12,12 @@ export default function SetupWizard() {
 
   useEffect(() => {
     let cancelled = false
-
     async function check() {
       try {
-        const status = await getFRStatus()
+        const status = await getFreeRoutingStatus()
         if (cancelled) return
         dispatch({ type: 'SET_FR_STATUS', payload: status })
-
-        if (status.status === 'not-installed') {
-          window.downloadFR()
-
-          const poll = setInterval(async () => {
-            const s = await getFRStatus()
-            if (cancelled) { clearInterval(poll); return }
-            dispatch({ type: 'SET_FR_STATUS', payload: s })
-            if (s.status === 'ready') {
-              clearInterval(poll)
-              startFRProcess()
-            }
-            if (s.status === 'error') {
-              clearInterval(poll)
-              setError(s.message || 'Download failed')
-            }
-          }, 500)
-        } else if (status.status === 'ready') {
-          startFRProcess()
-        } else if (status.status === 'error') {
-          setError(status.message || 'Unknown error')
-        }
+        if (status.status === 'ready') startFreeRoutingProcess()
       } catch (err) {
         setError(String(err))
       }
@@ -49,8 +26,17 @@ export default function SetupWizard() {
     return () => { cancelled = true }
   }, [])
 
-  const startFRProcess = () => {
-    const err = window.startFR()
+  const handleSelectFreeRouting = async () => {
+    const path = await window.selectFreeRoutingPath()
+    if (path) {
+      const s = await getFreeRoutingStatus()
+      dispatch({ type: 'SET_FR_STATUS', payload: s })
+      if (s.status === 'ready') startFreeRoutingProcess()
+    }
+  }
+
+  const startFreeRoutingProcess = async () => {
+    const err = await window.startFreeRouting()
     if (err) {
       setError(err)
     } else {
@@ -58,7 +44,7 @@ export default function SetupWizard() {
         try {
           const res = await fetch('http://127.0.0.1:9080/v1/system/status')
           if (res.ok) {
-            const s = await getFRStatus()
+            const s = await getFreeRoutingStatus()
             dispatch({ type: 'SET_FR_STATUS', payload: s })
             clearInterval(poll)
           }
@@ -67,37 +53,26 @@ export default function SetupWizard() {
     }
   }
 
-  const { frStatus, downloadProgress } = state
-
   return (
     <div style={s.overlay}>
       <div style={s.modal}>
         <h2 style={s.title}>FreeRouting Desktop</h2>
-
-        {frStatus === 'loading' && <p style={s.text}>Initializing...</p>}
-
-        {(frStatus === 'not-installed' || frStatus === 'downloading') && (
+        {state.frStatus === 'loading' && <p style={s.text}>Initializing...</p>}
+        {state.frStatus === 'not-installed' && (
           <>
-            <p style={s.text}>FreeRouting not found. Downloading...</p>
-            <div style={s.progressBar}>
-              <div style={{ ...s.progressFill, width: `${downloadProgress}%` }} />
+            <p style={s.text}>FreeRouting is not installed on your system.</p>
+            <p style={s.hint}>Download FreeRouting from the official GitHub page, install it, then select the executable below.</p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
+              <button style={s.btn} onClick={() => window.openURL('https://github.com/freerouting/freerouting/releases/latest')}>
+                Download FreeRouting
+              </button>
+              <button style={{ ...s.btn, background: '#16c79a' }} onClick={handleSelectFreeRouting}>
+                Select FreeRouting Executable
+              </button>
             </div>
-            <p style={s.progressText}>{downloadProgress}%</p>
           </>
         )}
-
-        {frStatus === 'installing' && (
-          <p style={s.text}>Installing FreeRouting...</p>
-        )}
-
-        {error && (
-          <div style={s.error}>
-            <p>Error: {error}</p>
-            <button style={s.retryBtn} onClick={() => window.downloadFR()}>
-              Retry
-            </button>
-          </div>
-        )}
+        {error && <p style={{ ...s.text, color: '#e94560', marginTop: 16 }}>Error: {error}</p>}
       </div>
     </div>
   )
@@ -105,12 +80,9 @@ export default function SetupWizard() {
 
 const s: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modal: { background: '#16213e', borderRadius: 12, padding: '40px 48px', textAlign: 'center' as const, minWidth: 400, border: '1px solid #0f3460' },
+  modal: { background: '#16213e', borderRadius: 12, padding: '40px 48px', textAlign: 'center' as const, minWidth: 420, border: '1px solid #0f3460' },
   title: { color: '#e94560', marginBottom: 24, fontSize: 20 },
-  text: { color: '#aaa', marginBottom: 16, fontSize: 14 },
-  progressBar: { height: 6, background: '#0f3460', borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
-  progressFill: { height: '100%', background: '#e94560', transition: 'width 0.3s' },
-  progressText: { color: '#888', fontSize: 12 },
-  error: { marginTop: 16 },
-  retryBtn: { marginTop: 8, padding: '6px 20px', border: '1px solid #0f3460', borderRadius: 4, background: '#e94560', color: '#fff', cursor: 'pointer' },
+  text: { color: '#aaa', marginBottom: 8, fontSize: 14, lineHeight: 1.5 },
+  hint: { color: '#777', fontSize: 12, lineHeight: 1.5, marginTop: 4 },
+  btn: { padding: '8px 20px', border: 'none', borderRadius: 6, background: '#e94560', color: '#fff', cursor: 'pointer', fontSize: 13 },
 }

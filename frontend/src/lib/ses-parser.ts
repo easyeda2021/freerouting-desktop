@@ -1,4 +1,4 @@
-import type { BoardData, TraceData, ViaData, ComponentData, PadstackData, ShapeData, LayerInfo } from './board-types'
+import type { BoardData, ViaData, ShapeData } from './board-types'
 
 // ===== Tokenizer =====
 type Token =
@@ -98,35 +98,10 @@ class SesTokenizer {
   }
 }
 
-// ===== S-Expression Parser =====
+// ===== S-Expression types =====
 type SExpr = string | number | SExpr[]
 
-function parseSExpr(tokens: SesTokenizer): SExpr | null {
-  const token = tokens.nextToken()
-  if (!token) return null
-
-  if (token.type === 'open') {
-    const list: SExpr[] = []
-    while (true) {
-      const peek = tokens.nextToken()
-      if (!peek) break
-      if (peek.type === 'close') break
-      // Put the peeked token back conceptually by reparsing
-      // Simple approach: use a second tokenizer or re-parse
-      // ponytail: re-tokenize the same input with an offset
-      break // This won't work properly — let's fix
-    }
-  }
-
-  if (token.type === 'string') return token.value
-  if (token.type === 'integer') return token.value
-  if (token.type === 'float') return token.value
-
-  return null
-}
-
 // ===== Proper recursive descent =====
-// ponytail: manual recursive descent, handles the full SES spec
 
 export function parseSes(content: string): BoardData {
   const tokens = tokenize(content)

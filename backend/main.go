@@ -46,7 +46,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		stopFR()
+		stopFreeRouting()
 		os.Exit(0)
 	}()
 
@@ -74,10 +74,11 @@ func main() {
 	w.SetTitle("FreeRouting Desktop " + version)
 	w.SetSize(1400, 900, webview.HintNone)
 
-	w.Bind("checkFRStatus", checkFRStatus)
-	w.Bind("downloadFR", downloadFR)
-	w.Bind("startFR", startFR)
-	w.Bind("stopFR", stopFR)
+	w.Bind("checkFreeRoutingStatus", checkFreeRoutingStatus)
+	w.Bind("selectFreeRoutingPath", selectFreeRoutingPath)
+	w.Bind("startFreeRouting", startFreeRouting)
+	w.Bind("stopFreeRouting", stopFreeRouting)
+	w.Bind("openURL", openURL)
 	w.Bind("openFileDialog", openFileDialog)
 	w.Bind("saveFileDialog", saveFileDialog)
 	w.Bind("readFile", readFile)

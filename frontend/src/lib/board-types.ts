@@ -54,7 +54,7 @@ export interface LogEntry {
 }
 
 export interface FRStatusData {
-  status: 'loading' | 'not-installed' | 'downloading' | 'installing' | 'ready' | 'error'
+  status: 'loading' | 'not-installed' | 'ready' | 'error'
   version?: string
   progress: number
   message?: string
