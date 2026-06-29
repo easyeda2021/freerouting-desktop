@@ -1,3 +1,11 @@
+function uuidv4(): string {
+  // Compatible UUID v4 generator for WebView2 environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
 const PROXY_BASE = 'http://127.0.0.1:9080'
 
 async function request(method: string, path: string, body?: unknown) {
@@ -5,7 +13,7 @@ async function request(method: string, path: string, body?: unknown) {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'Freerouting-Profile-ID': crypto.randomUUID(),
+      'Freerouting-Profile-ID': uuidv4(),
       'Freerouting-Environment-Host': 'FreeRoutingDesktop/0.1.0',
     },
   }
@@ -14,7 +22,8 @@ async function request(method: string, path: string, body?: unknown) {
   }
   const res = await fetch(`${PROXY_BASE}${path}`, opts)
   if (!res.ok) {
-    throw new Error(`API ${method} ${path}: ${res.status}`)
+    const body = await res.text().catch(() => '')
+    throw new Error(`API ${method} ${path}: ${res.status} ${body}`)
   }
   return res.json()
 }
@@ -27,7 +36,6 @@ export async function createJob(sessionId: string): Promise<{ id: string }> {
   return request('POST', '/v1/jobs/enqueue', {
     session_id: sessionId,
     name: 'My Design',
-    state: 'QUEUED',
   })
 }
 
