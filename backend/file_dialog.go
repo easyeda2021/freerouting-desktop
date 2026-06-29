@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -58,6 +59,11 @@ func openExecutableDialogWindows() (string, error) {
 }
 
 func fileDialogWindows(filter, title string) (string, error) {
+	initialDir := getLastDir()
+	dirScript := ""
+	if initialDir != "" {
+		dirScript = fmt.Sprintf(`$dialog.InitialDirectory = "%s"`, strings.ReplaceAll(initialDir, `\`, `\\`))
+	}
 	script := fmt.Sprintf(`
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form
@@ -65,11 +71,12 @@ $form.TopMost = $true
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Filter = "%s"
 $dialog.Title = "%s"
+%s
 if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 	$dialog.FileName
 }
 $form.Dispose()
-`, filter, title)
+`, filter, title, dirScript)
 	cmd := exec.Command("powershell", "-NoProfile", "-Command", script)
 	hideWindow(cmd)
 	out, err := cmd.Output()
@@ -205,6 +212,9 @@ func openFileDialog() string {
 	if err != nil {
 		return ""
 	}
+	if path != "" {
+		saveLastDir(filepath.Dir(path))
+	}
 	return path
 }
 
@@ -212,6 +222,9 @@ func saveFileDialog(defaultName string) string {
 	path, err := saveNativeFileDialog(defaultName)
 	if err != nil {
 		return ""
+	}
+	if path != "" {
+		saveLastDir(filepath.Dir(path))
 	}
 	return path
 }
@@ -244,3 +257,4 @@ func openURL(url string) {
 		exec.Command("xdg-open", url).Start()
 	}
 }
+

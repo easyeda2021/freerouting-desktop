@@ -116,7 +116,13 @@ function findList(items: SExpr[], keyword: string): SExpr[] | null {
 export function parseDsn(content: string): BoardData {
   const tokens = tokenize(content)
   const pos = { i: 0 }
-  const root = parseList(tokens, pos)
+  let root: SExpr[]
+  try {
+    root = parseList(tokens, pos)
+  } catch (e) {
+    console.error('DSN parse error:', e)
+    throw e
+  }
 
   const boardData: BoardData = {
     resolutionUnit: 'um',
@@ -131,6 +137,30 @@ export function parseDsn(content: string): BoardData {
   const layerSet = new Set<string>()
   let denom = 1
 
+  function addPath(pathList: SExpr[], netName: string) {
+    const layer = String(pathList[1])
+    const width = Number(pathList[2]) / denom
+    layerSet.add(layer)
+    const corners: [number, number][] = []
+
+    let i = 3
+    if (i < pathList.length && Array.isArray(pathList[i]) && (pathList[i] as SExpr[])[0] === 'pt') {
+      for (; i < pathList.length; i++) {
+        if (Array.isArray(pathList[i]) && (pathList[i] as SExpr[])[0] === 'pt') {
+          const pt = pathList[i] as SExpr[]
+          corners.push([Number(pt[1]) / denom, Number(pt[2]) / denom])
+        }
+      }
+    } else {
+      for (; i < pathList.length - 1; i += 2) {
+        corners.push([Number(pathList[i]) / denom, Number(pathList[i + 1]) / denom])
+      }
+    }
+    if (corners.length >= 2) {
+      boardData.traces.push({ netName, layer, width, corners })
+    }
+  }
+
   // Parse structure section
   const structure = findList(root, 'structure')
   if (structure) {
@@ -141,7 +171,6 @@ export function parseDsn(content: string): BoardData {
       denom = boardData.resolutionDenominator || 1
     }
 
-    // Parse layer definitions
     const layerList = findList(structure, 'layer')
     if (layerList) {
       for (let i = 1; i < layerList.length; i++) {
@@ -159,33 +188,31 @@ export function parseDsn(content: string): BoardData {
     for (const item of network) {
       if (!Array.isArray(item) || item[0] !== 'net') continue
       const netName = String(item[1])
+      const netList = item as SExpr[]
 
-      for (const sub of item.slice(2)) {
-        if (!Array.isArray(sub)) continue
+      for (const subRaw of netList.slice(2)) {
+        if (!Array.isArray(subRaw)) continue
+        const sub = subRaw as SExpr[]
 
-        // Parse paths (wires/traces)
-        if (sub[0] === 'path') {
-          const layer = String(sub[1])
-          const width = Number(sub[2]) / denom
-          layerSet.add(layer)
-          const corners: [number, number][] = []
-          for (let i = 3; i < sub.length - 1; i += 2) {
-            corners.push([Number(sub[i]) / denom, Number(sub[i + 1]) / denom])
-          }
-          if (corners.length >= 2) {
-            boardData.traces.push({ netName, layer, width, corners })
+        if (sub[0] === 'wire') {
+          for (const wsRaw of sub.slice(1)) {
+            if (!Array.isArray(wsRaw)) continue
+            const ws = wsRaw as SExpr[]
+            if (ws[0] === 'path') addPath(ws, netName)
           }
         }
 
-        // Parse vias
+        if (sub[0] === 'path') {
+          addPath(sub, netName)
+        }
+
         if (sub[0] === 'via') {
           const via: ViaData = {
             netName,
             padstackName: String(sub[1]),
             center: [Number(sub[2]) / denom, Number(sub[3]) / denom],
-            diameter: 30 / denom, // default fallback
+            diameter: 30 / denom,
           }
-          // Try to get diameter from via structure
           if (sub[4] !== undefined && typeof sub[4] === 'number') {
             via.diameter = Number(sub[4]) / denom
           }

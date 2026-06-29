@@ -8,12 +8,15 @@ function uuidv4(): string {
 
 const PROXY_BASE = 'http://127.0.0.1:9080'
 
+// Stable profile ID for the lifetime of this app session
+const PROFILE_ID = uuidv4()
+
 async function request(method: string, path: string, body?: unknown) {
   const opts: RequestInit = {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'Freerouting-Profile-ID': uuidv4(),
+      'Freerouting-Profile-ID': PROFILE_ID,
       'Freerouting-Environment-Host': 'FreeRoutingDesktop/0.1.0',
     },
   }

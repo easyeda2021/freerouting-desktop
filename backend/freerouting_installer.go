@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +20,11 @@ type FreeRoutingStatus struct {
 	Version  string `json:"version,omitempty"`
 	Progress int    `json:"progress"`
 	Message  string `json:"message,omitempty"`
+}
+
+type Config struct {
+	BinPath     string `json:"bin_path"`
+	LastDir     string `json:"last_dir"`
 }
 
 var (
@@ -44,7 +51,7 @@ func checkFreeRoutingStatus() string {
 	if savedPath != "" {
 		if _, err := os.Stat(savedPath); err == nil {
 			freeroutingBinPath = savedPath
-			freeroutingStatus = FreeRoutingStatus{Status: "ready", Version: filepath.Base(filepath.Dir(filepath.Dir(savedPath)))}
+			freeroutingStatus = FreeRoutingStatus{Status: "ready", Version: queryFRVersion()}
 			goto done
 		}
 	}
@@ -52,7 +59,7 @@ func checkFreeRoutingStatus() string {
 	if bin, ok := checkFreeRoutingInstalledSystem(); ok {
 		freeroutingBinPath = bin
 		saveFreeRoutingPath(bin)
-		freeroutingStatus = FreeRoutingStatus{Status: "ready", Version: "system"}
+		freeroutingStatus = FreeRoutingStatus{Status: "ready", Version: queryFRVersion()}
 		goto done
 	}
 
@@ -63,17 +70,67 @@ done:
 	return string(data)
 }
 
-func loadFreeRoutingPath() string {
+func queryFRVersion() string {
+	// Try API first (FR is already running)
+	v := getFreeRoutingVersionFromAPI()
+	if v != "" {
+		return v
+	}
+	// Fall back to reading freerouting.jar manifest or just return ""
+	return ""
+}
+
+func loadConfig() Config {
+	var cfg Config
 	data, err := os.ReadFile(getConfigPath())
 	if err != nil {
-		return ""
+		return cfg
 	}
-	return string(data)
+	json.Unmarshal(data, &cfg)
+	return cfg
+}
+
+func saveConfig(cfg Config) {
+	os.MkdirAll(getFreeRoutingDir(), 0755)
+	data, _ := json.MarshalIndent(cfg, "", "  ")
+	os.WriteFile(getConfigPath(), data, 0644)
+}
+
+func loadFreeRoutingPath() string {
+	return loadConfig().BinPath
 }
 
 func saveFreeRoutingPath(path string) {
-	os.MkdirAll(getFreeRoutingDir(), 0755)
-	os.WriteFile(getConfigPath(), []byte(path), 0644)
+	cfg := loadConfig()
+	cfg.BinPath = path
+	saveConfig(cfg)
+}
+
+func getLastDir() string {
+	return loadConfig().LastDir
+}
+
+func saveLastDir(dir string) {
+	cfg := loadConfig()
+	cfg.LastDir = dir
+	saveConfig(cfg)
+}
+
+func getFreeRoutingVersionFromAPI() string {
+	resp, err := http.Get("http://127.0.0.1:37864/v1/system/version")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return ""
+	}
+	if v, ok := result["version"]; ok {
+		return fmt.Sprintf("%v", v)
+	}
+	return ""
 }
 
 func selectFreeRoutingPath() string {
@@ -87,7 +144,7 @@ func selectFreeRoutingPath() string {
 	freeroutingMutex.Lock()
 	freeroutingBinPath = path
 	saveFreeRoutingPath(path)
-	freeroutingStatus = FreeRoutingStatus{Status: "ready", Version: "user"}
+	freeroutingStatus = FreeRoutingStatus{Status: "ready", Version: queryFRVersion()}
 	freeroutingMutex.Unlock()
 	return path
 }
