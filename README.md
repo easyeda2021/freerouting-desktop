@@ -4,6 +4,10 @@ Modern desktop GUI for [FreeRouting](https://github.com/freerouting/freerouting)
 
 Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host detects whether FreeRouting is installed on the system, downloads and installs it if not, then launches it in API mode. The frontend (React + TypeScript + LeaferJS) renders the PCB board and communicates directly with the FreeRouting HTTP API through a CORS proxy.
 
+## Download
+
+You can download the file at [build](./build) 
+
 ## Architecture
 
 ```
@@ -20,15 +24,15 @@ Go Host (WebView + FR Installer + CORS Proxy)
 
 ## Platform Support
 
-| Platform | WebView Engine | FreeRouting Package |
-|----------|---------------|---------------------|
-| Windows | Edge WebView2 (built-in) | `.msi` installer |
-| macOS | Cocoa WKWebView (built-in) | `.dmg` image |
-| Linux | GTK + WebKitGTK | `.zip` archive |
+FreeRouting Desktop runs on the platform's built-in WebView engine:
 
-FreeRouting packages bundle their own JRE — users never need to install Java.
+| Platform | WebView Engine |
+|----------|---------------|
+| Windows | Edge WebView2 |
+| macOS | Cocoa WKWebView |
+| Linux | GTK + WebKitGTK |
 
-> The table above lists the **FreeRouting** package format that the Go host downloads when FreeRouting is not already installed. FreeRouting Desktop itself is shipped as a single executable (`freerouting-desktop.exe` on Windows).
+The app itself is shipped as a single executable (`freerouting-desktop.exe` on Windows). When FreeRouting is not already installed, the Go host downloads the platform-specific FreeRouting package (`.msi`/`.zip` on Windows, `.dmg` on macOS, `.zip` on Linux) from GitHub Releases. FreeRouting packages bundle their own JRE — users never need to install Java.
 
 ## Development
 
