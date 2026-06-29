@@ -204,17 +204,34 @@ export function parseDsn(content: string): BoardData {
     if (boundary) {
       for (const bItem of boundary) {
         if (Array.isArray(bItem) && bItem.length >= 2 && (bItem[0] === 'path' || bItem[0] === 'wire')) {
-          const coords: [number, number][] = []
+          // Collect all coordinate pairs from index 2
+          const rawCoords: [number, number][] = []
           for (let i = 2; i < bItem.length - 1; i += 2) {
-            coords.push([Number(bItem[i]), Number(bItem[i + 1])])
+            rawCoords.push([Number(bItem[i]), Number(bItem[i + 1])])
           }
-          if (coords.length >= 2) {
-            boardData.traces.push({
-              netName: '',
-              layer: String(bItem[1]),
-              width: 0.5,
-              corners: coords,
-            })
+          if (rawCoords.length < 2) continue
+          // Deduplicate consecutive identical points
+          const unique: [number, number][] = [rawCoords[0]]
+          for (let i = 1; i < rawCoords.length; i++) {
+            if (rawCoords[i][0] !== rawCoords[i-1][0] || rawCoords[i][1] !== rawCoords[i-1][1]) {
+              unique.push(rawCoords[i])
+            }
+          }
+          if (unique.length < 3) {
+            // Degenerate boundary — compute bounding box from all raw coords
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+            for (const [x, y] of rawCoords) {
+              if (x < minX) minX = x
+              if (y < minY) minY = y
+              if (x > maxX) maxX = x
+              if (y > maxY) maxY = y
+            }
+            if (isFinite(minX)) {
+              const rect: [number, number][] = [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]]
+              boardData.traces.push({ netName: '', layer: String(bItem[1]), width: 0.5, corners: rect })
+            }
+          } else {
+            boardData.traces.push({ netName: '', layer: String(bItem[1]), width: 0.5, corners: unique })
           }
         }
       }

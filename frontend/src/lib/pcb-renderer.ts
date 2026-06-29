@@ -7,7 +7,8 @@ export function createPcbRenderer(container: HTMLElement) {
   const app = new App({
     view: container,
     tree: { type: 'design' as const },
-    // editor: {},
+    wheel: { zoomMode: true },
+    move: { disabled: false, holdSpaceKey: false },
   })
 
   const layerGroups = new Map<string, Group>()
