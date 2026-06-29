@@ -13,6 +13,8 @@ export function createPcbRenderer(container: HTMLElement) {
     wheel: { zoomMode: false },
     move: { disabled: true },
   })
+  // DSN/SES coordinates are Y-up; canvas is Y-down
+  ;(app.tree as any).scaleY = -1
 
   const layerGroups = new Map<string, Group>()
 
@@ -29,7 +31,10 @@ export function createPcbRenderer(container: HTMLElement) {
 
   function fitView() {
     try {
-      ;(app.tree as any).zoom?.('fit')
+      const tree = app.tree as any
+      tree.zoom?.('fit')
+      // Preserve Y-flip after fit
+      tree.scaleY = -Math.abs(tree.scaleX || 1)
     } catch (e) {
       console.error('PCB fit error:', e)
     }
@@ -168,20 +173,23 @@ export function createPcbRenderer(container: HTMLElement) {
 
   function zoomBy(delta: number, cx?: number, cy?: number) {
     const tree = app.tree as any
-    const scale = getScale()
+    const sx = tree.scaleX || 1
+    const sy = tree.scaleY || 1
     const factor = delta > 0 ? 0.9 : 1.1
-    const next = Math.max(0.001, Math.min(scale * factor, 1000))
+    const next = Math.max(0.001, Math.min(Math.abs(sx) * factor, 1000))
+    const signX = Math.sign(sx) || 1
+    const signY = Math.sign(sy) || 1
     if (cx !== undefined && cy !== undefined) {
-      // Zoom towards pointer position
-      const wx = (cx - (tree.x || 0)) / scale
-      const wy = (cy - (tree.y || 0)) / scale
-      tree.scaleX = next
-      tree.scaleY = next
-      tree.x = cx - wx * next
-      tree.y = cy - wy * next
+      // Zoom towards pointer position, respecting the Y-flip
+      const wx = (cx - (tree.x || 0)) / sx
+      const wy = (cy - (tree.y || 0)) / sy
+      tree.scaleX = next * signX
+      tree.scaleY = next * signY
+      tree.x = cx - wx * next * signX
+      tree.y = cy - wy * next * signY
     } else {
-      tree.scaleX = next
-      tree.scaleY = next
+      tree.scaleX = next * signX
+      tree.scaleY = next * signY
     }
   }
 
