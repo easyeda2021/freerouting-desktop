@@ -1,4 +1,5 @@
 import { App, Line, Ellipse, Group } from 'leafer-ui'
+import '@leafer-in/view'
 import type { BoardData } from './board-types'
 
 const LAYER_COLORS = ['#e94560', '#0f3460', '#16c79a', '#f5a623', '#a855f7', '#06b6d4', '#84cc16', '#ec4899']
