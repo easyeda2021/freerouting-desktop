@@ -69,7 +69,7 @@ func main() {
 
 	// Step 3: create WebView
 	log.Println("Step 3: creating WebView...")
-	w := webview.New(false)
+	w := webview.New(true)
 	log.Println("Step 3: WebView created OK")
 	defer w.Destroy()
 
