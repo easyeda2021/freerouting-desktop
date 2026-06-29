@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -289,9 +288,7 @@ func startFreeRouting() string {
 	freeroutingProcess = exec.Command(bin, args...)
 	freeroutingProcess.Stdout = os.Stdout
 	freeroutingProcess.Stderr = os.Stderr
-	if runtime.GOOS == "windows" {
-		freeroutingProcess.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	}
+	hideWindow(freeroutingProcess)
 
 	if err := freeroutingProcess.Start(); err != nil {
 		freeroutingProcess = nil

@@ -8,14 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 )
-
-func hideWindow(cmd *exec.Cmd) {
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	}
-}
 
 func openNativeFileDialog() (string, error) {
 	switch runtime.GOOS {
