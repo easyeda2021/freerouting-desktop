@@ -59,16 +59,6 @@ func openExecutableDialogWindows() (string, error) {
 	return fileDialogWindows("Executable (*.exe)|*.exe|All Files (*.*)|*.*", "Select FreeRouting Executable")
 }
 
-func powershellPath() string {
-	if p, err := exec.LookPath("powershell.exe"); err == nil {
-		return p
-	}
-	if p, err := exec.LookPath("powershell"); err == nil {
-		return p
-	}
-	return `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
-}
-
 func initialDirScriptWindows() string {
 	dir := getLastDir()
 	if dir == "" {
@@ -98,9 +88,7 @@ $form.Dispose()
 `, filter, title, initialDirScriptWindows())
 	// DO NOT hide window for file dialogs — PowerShell needs a visible window
 	// to show Windows.Forms dialogs properly
-	ps := powershellPath()
-	log.Printf("fileDialogWindows using powershell path: %q", ps)
-	out, err := exec.Command(ps, "-Sta", "-NoProfile", "-Command", script).Output()
+	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
 	if err != nil {
 		return "", err
 	}
@@ -123,9 +111,7 @@ if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 $form.Dispose()
 `, defaultName, initialDirScriptWindows())
 	// DO NOT hide window for file dialogs
-	ps := powershellPath()
-	log.Printf("saveFileDialogWindows using powershell path: %q", ps)
-	out, err := exec.Command(ps, "-Sta", "-NoProfile", "-Command", script).Output()
+	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
 	if err != nil {
 		return "", err
 	}
