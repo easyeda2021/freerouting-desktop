@@ -34,7 +34,7 @@ FreeRouting packages bundle their own JRE — users never need to install Java.
 
 - [Go](https://go.dev/dl/) 1.21+
 - [Node.js](https://nodejs.org/) 18+
-- [Make](https://www.gnu.org/software/make/)
+- [Make](https://www.gnu.org/software/make/). On Windows with MSYS2 install it with `pacman -S make`; the executable is in `C:\msys64\usr\bin`, **not** `C:\msys64\mingw64\bin`.
 - C compiler (MinGW-w64 on Windows, Xcode CLI on macOS, GCC on Linux)
 - [go-winres](https://github.com/tc-hib/go-winres) (`go install github.com/tc-hib/go-winres@latest`) — required for Windows icon/version resources
 
@@ -70,12 +70,39 @@ make linux
 
 The Windows executable is written to `build/freerouting-desktop-<version>-windows-x64.exe`.
 
-**Note on Windows toolchains:** `webview_go` requires CGO. Make sure MinGW-w64 is installed and its `bin` directory is on your PATH, then build with the compiler discoverable as `gcc`:
+**Note on Windows toolchains:** `webview_go` requires CGO. Make sure MinGW-w64 is installed and its `bin` directory is on your PATH, then build with the compiler discoverable as `gcc`.
+
+On Windows with MSYS2 you also need to install `make` (`pacman -S make`) and put both `usr\bin` (for `make`) and `mingw64\bin` (for `gcc`) on PATH:
 
 ```powershell
-# Example with MSYS2 MinGW-w64
-$env:PATH = "C:\msys64\mingw64\bin;" + $env:PATH
+$env:PATH = "C:\msys64\mingw64\bin;C:\msys64\usr\bin;" + $env:PATH
+$env:CC = "gcc"
 make windows
+```
+
+#### Manual build without Make
+
+If `make` is unavailable, run the equivalent steps manually (PowerShell example):
+
+```powershell
+$env:PATH = "C:\msys64\mingw64\bin;" + $env:PATH
+$env:CC = "gcc"
+
+# 1. Build frontend
+cd frontend
+npm run build
+cd ..
+
+# 2. Copy dist into backend for Go embed
+Remove-Item -Recurse -Force backend/dist
+Copy-Item -Recurse frontend/dist backend/dist
+
+# 3. Generate Windows icon/version resources (requires go-winres)
+python3 scripts/gen-res.py
+
+# 4. Build Windows binary
+cd backend
+go build -ldflags="-s -w -H windowsgui -X main.version=$(Get-Content ..\VERSION) -X main.platform=windows" -o "../build/freerouting-desktop-$(Get-Content ..\VERSION)-windows-x64.exe" .
 ```
 
 #### Simplified / no-icon build
