@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"syscall"
@@ -26,13 +27,21 @@ var (
 )
 
 func main() {
-	logFile, _ := os.Create(os.TempDir() + "/fr.log")
-	writers := []io.Writer{os.Stderr}
+	logPath := filepath.Join(getFreeRoutingDir(), "app.log")
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	writers := []io.Writer{}
 	if logFile != nil {
 		writers = append(writers, logFile)
 		defer logFile.Close()
 	}
-	log.SetOutput(io.MultiWriter(writers...))
+	// In dev mode (console app) also mirror to stderr; in GUI builds stderr
+	// writes can fail and block the file writer when using MultiWriter.
+	if version == "dev" {
+		writers = append(writers, os.Stderr)
+	}
+	if len(writers) > 0 {
+		log.SetOutput(io.MultiWriter(writers...))
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
