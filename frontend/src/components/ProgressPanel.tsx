@@ -4,14 +4,12 @@ export default function ProgressPanel() {
   const { state } = useApp()
   const { jobState, jobStage, currentPass, score } = state
 
-  if (!jobState) return null
-
   const progress = jobState === 'COMPLETED' ? 100 : jobState === 'RUNNING' ? Math.min(currentPass * 2, 95) : 0
 
   return (
     <div style={s.panel}>
       <div style={s.row}>
-        <span>State: {jobState}</span>
+        <span>State: {jobState || 'Idle'}</span>
         {jobStage && <span>Stage: {jobStage}</span>}
         {currentPass > 0 && <span>Pass: {currentPass}</span>}
         {score > 0 && <span>Score: {score.toFixed(2)}</span>}

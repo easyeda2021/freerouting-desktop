@@ -250,7 +250,7 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
   } else if (shape.shapeType === 'path') {
     const width = shape.params[0]
     const coords = shape.params.slice(1)
-    if (coords.length >= 4) {
+    if (coords.length >= 4 && width > 0) {
       const x1 = coords[0]
       const y1 = coords[1]
       const x2 = coords[2]
@@ -258,17 +258,29 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
       const dx = x2 - x1
       const dy = y2 - y1
       const length = Math.sqrt(dx * dx + dy * dy)
-      if (length > 0) {
+      if (length === 0) {
+        // Zero-length path: render as a circle (EasyEDA/KiCad round pads)
+        group.add(
+          new Ellipse({
+            x: x1 - width / 2,
+            y: y1 - width / 2,
+            width,
+            height: width,
+            fill: color,
+            stroke: darken(color),
+            strokeWidth: Math.max(width * 0.04, 1),
+          })
+        )
+      } else {
+        // Render as a stadium (bullet): rectangle with semicircular ends
         const angle = (Math.atan2(dy, dx) * 180) / Math.PI
         const cx = (x1 + x2) / 2
         const cy = (y1 + y2) / 2
         const capsule = new Group({ x: cx, y: cy, rotation: angle })
+        const points = stadiumPoints(length, width, 16)
         capsule.add(
-          new Ellipse({
-            x: -(length + width) / 2,
-            y: -width / 2,
-            width: length + width,
-            height: width,
+          new Polygon({
+            points,
             fill: color,
             stroke: darken(color),
             strokeWidth: Math.max(width * 0.04, 1),
@@ -301,6 +313,23 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
       }
     }
   }
+}
+
+function stadiumPoints(length: number, width: number, segments = 16): number[] {
+  const points: number[] = []
+  const r = width / 2
+  const half = length / 2
+  // Right semicircle from top to bottom
+  for (let i = 0; i <= segments; i++) {
+    const angle = Math.PI / 2 - (Math.PI * i) / segments
+    points.push(half + r * Math.cos(angle), r * Math.sin(angle))
+  }
+  // Left semicircle from bottom to top
+  for (let i = 0; i <= segments; i++) {
+    const angle = -Math.PI / 2 + (Math.PI * i) / segments
+    points.push(-half + r * Math.cos(angle), r * Math.sin(angle))
+  }
+  return points
 }
 
 function computeBounds(data: BoardData) {
