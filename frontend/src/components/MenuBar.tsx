@@ -31,6 +31,8 @@ export default function MenuBar() {
     try {
       const content = await file.text()
       if (!content) return
+      // Save filename hint in localStorage
+      try { localStorage.setItem('last_dsn_file', file.name) } catch { /* ignore */ }
 
       dispatch({ type: 'RESET' })
 

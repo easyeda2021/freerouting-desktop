@@ -7,12 +7,24 @@ type Token =
   | { type: 'integer'; value: number }
   | { type: 'float'; value: number }
 
+function hasMatchingQuote(input: string, pos: number): boolean {
+  const quote = input[pos]
+  let i = pos + 1
+  while (i < input.length) {
+    const ch = input[i++]
+    if (ch === quote) return true
+    if (ch === ')' || ch === '\n' || ch === '\r') return false
+  }
+  return false
+}
+
 class DsnTokenizer {
   private input: string
   private pos = 0
 
   constructor(input: string) {
-    this.input = input
+    // Strip BOM if present
+    this.input = input.charCodeAt(0) === 0xFEFF ? input.slice(1) : input
   }
 
   nextToken(): Token | null {
@@ -22,7 +34,9 @@ class DsnTokenizer {
     const ch = this.input[this.pos]
     if (ch === '(') { this.pos++; return { type: 'open' } }
     if (ch === ')') { this.pos++; return { type: 'close' } }
-    if (ch === '"') return this.readString()
+    if (ch === '"' || ch === "'") {
+      if (hasMatchingQuote(this.input, this.pos)) return this.readString(ch)
+    }
     if (/[+-]?\d/.test(ch)) return this.readNumber()
     return this.readBareword()
   }
@@ -31,7 +45,7 @@ class DsnTokenizer {
     while (this.pos < this.input.length) {
       const ch = this.input[this.pos]
       if (ch === ';') {
-        while (this.pos < this.input.length && this.input[this.pos] !== '\n') this.pos++
+        while (this.pos < this.input.length && this.input[this.pos] !== '\n' && this.input[this.pos] !== '\r') this.pos++
         continue
       }
       if (!/\s/.test(ch)) break
@@ -39,12 +53,12 @@ class DsnTokenizer {
     }
   }
 
-  private readString(): Token {
-    this.pos++
+  private readString(quote: string): Token {
+    this.pos++ // skip opening quote
     let value = ''
     while (this.pos < this.input.length) {
       const ch = this.input[this.pos++]
-      if (ch === '"') break
+      if (ch === quote) break
       if (ch === '\\') { value += this.input[this.pos++] || '' }
       else { value += ch }
     }
@@ -61,6 +75,7 @@ class DsnTokenizer {
       else if (ch === '-' || ch === '+') { if (num === '') { num += ch; this.pos++ } else break }
       else break
     }
+    if (num === '' || num === '-' || num === '+') return { type: 'string', value: num }
     if (isFloat) return { type: 'float', value: parseFloat(num) }
     return { type: 'integer', value: parseInt(num, 10) }
   }
@@ -69,7 +84,7 @@ class DsnTokenizer {
     let value = ''
     while (this.pos < this.input.length) {
       const ch = this.input[this.pos]
-      if (/\s/.test(ch) || ch === '(' || ch === ')' || ch === '"') break
+      if (/\s/.test(ch) || ch === '(' || ch === ')' || ch === '"' || ch === "'") break
       value += ch
       this.pos++
     }
