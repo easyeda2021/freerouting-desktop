@@ -78,9 +78,28 @@ class DsnTokenizer {
       else if (ch === '-' || ch === '+') { if (num === '') { num += ch; this.pos++ } else break }
       else break
     }
+    // Tokens like EasyEDA pin names "0e14" or net names "3V3" start with a digit
+    // but are not pure numbers; consume the rest of the token as a bareword.
+    if (this.pos < this.input.length) {
+      const next = this.input[this.pos]
+      if (!/\s/.test(next) && next !== '(' && next !== ')' && next !== '"' && next !== "'") {
+        return { type: 'string', value: num + this.readBarewordRest() }
+      }
+    }
     if (num === '' || num === '-' || num === '+') return { type: 'string', value: num }
     if (isFloat) return { type: 'float', value: parseFloat(num) }
     return { type: 'integer', value: parseInt(num, 10) }
+  }
+
+  private readBarewordRest(): string {
+    let value = ''
+    while (this.pos < this.input.length) {
+      const ch = this.input[this.pos]
+      if (/\s/.test(ch) || ch === '(' || ch === ')' || ch === '"' || ch === "'") break
+      value += ch
+      this.pos++
+    }
+    return value
   }
 
   private readBareword(): Token {

@@ -280,14 +280,25 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
   } else if (shape.shapeType === 'polygon') {
     const coords = shape.params.slice(1)
     if (coords.length >= 6) {
-      group.add(
-        new Polygon({
-          points: coords,
-          fill: color,
-          stroke: darken(color),
-          strokeWidth: Math.max(shape.params[0] * 0.5, 0.5),
-        })
-      )
+      // Deduplicate consecutive duplicate points common in EasyEDA polygon pads
+      const deduped: number[] = []
+      for (let i = 0; i < coords.length; i += 2) {
+        const x = coords[i]
+        const y = coords[i + 1]
+        if (i === 0 || x !== coords[i - 2] || y !== coords[i - 1]) {
+          deduped.push(x, y)
+        }
+      }
+      if (deduped.length >= 6) {
+        group.add(
+          new Polygon({
+            points: deduped,
+            fill: color,
+            stroke: darken(color),
+            strokeWidth: Math.max(shape.params[0] * 0.5, 0.5),
+          })
+        )
+      }
     }
   }
 }
