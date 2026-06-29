@@ -11,8 +11,8 @@ export function createPcbRenderer(container: HTMLElement) {
   const app = new App({
     view: container,
     tree: { type: 'design' as const },
-    wheel: { zoomMode: true },
-    move: { disabled: false, holdSpaceKey: false },
+    wheel: { zoomMode: false },
+    move: { disabled: true },
   })
 
   const layerGroups = new Map<string, Group>()
@@ -148,7 +148,37 @@ export function createPcbRenderer(container: HTMLElement) {
     app.destroy()
   }
 
-  return { render, destroy, resize }
+  function getScale() {
+    const tree = app.tree as any
+    return tree.scaleX || 1
+  }
+
+  function zoomBy(delta: number, cx?: number, cy?: number) {
+    const tree = app.tree as any
+    const scale = getScale()
+    const factor = delta > 0 ? 0.9 : 1.1
+    const next = Math.max(0.001, Math.min(scale * factor, 1000))
+    if (cx !== undefined && cy !== undefined) {
+      // Zoom towards pointer position
+      const wx = (cx - (tree.x || 0)) / scale
+      const wy = (cy - (tree.y || 0)) / scale
+      tree.scaleX = next
+      tree.scaleY = next
+      tree.x = cx - wx * next
+      tree.y = cy - wy * next
+    } else {
+      tree.scaleX = next
+      tree.scaleY = next
+    }
+  }
+
+  function panBy(dx: number, dy: number) {
+    const tree = app.tree as any
+    tree.x = (tree.x || 0) + dx
+    tree.y = (tree.y || 0) + dy
+  }
+
+  return { render, destroy, resize, zoomBy, panBy, getScale }
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string) {
