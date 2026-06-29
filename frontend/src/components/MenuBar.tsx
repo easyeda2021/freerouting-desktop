@@ -1,6 +1,6 @@
 import { useRef, type ChangeEvent } from 'react'
 import { useApp } from '../App'
-import { createSession, createJob, uploadDsn, startRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
+import { createSession, createJob, uploadDsn, startRouting, cancelRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
 import type { LogEntry } from '../lib/board-types'
@@ -22,63 +22,48 @@ export default function MenuBar() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const outputFetchedRef = useRef(false)
 
-  const loadDsnFromContent = async (content: string, fileName: string) => {
-    outputFetchedRef.current = false
-    try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
+  const log = (type: 'Info' | 'Warn' | 'Error', message: string, topic = 'App') => {
+    dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type, message, topic } })
+  }
 
-    dispatch({ type: 'RESET' })
-
-    const initialBoard = parseDsn(content)
-    dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
-
-    const session = await createSession()
-    dispatch({ type: 'SET_SESSION', sessionId: session.id })
-
-    const job = await createJob(session.id)
-    dispatch({ type: 'SET_JOB', jobId: job.id })
-
-    await uploadDsn(job.id, fileName, content)
-    await startRouting(job.id)
-
-    streamLogs(job.id, (log) => {
-      dispatch({ type: 'ADD_LOG', entry: log as LogEntry })
-      const match = log.message.match(/score of ([\d.]+)/i)
+  const setupRoutingStreams = (jobId: string) => {
+    streamLogs(jobId, (entry) => {
+      dispatch({ type: 'ADD_LOG', entry: entry as LogEntry })
+      const match = entry.message.match(/score of ([\d.]+)/i)
       if (match) dispatch({ type: 'SET_SCORE', score: parseFloat(match[1]) })
     })
 
     let sesBuffer = ''
-    streamOutput(job.id, (data) => {
+    streamOutput(jobId, (data) => {
       try {
-        // The stream may send either raw base64 or a JSON wrapper {"data":"base64..."}
         let base64 = data
         if (data.trimStart().startsWith('{')) {
           const parsed = JSON.parse(data)
           base64 = parsed.data || parsed.output || parsed.ses || ''
         }
         if (!base64) return
-        // Accumulate base64 chunks; try parsing after each chunk
         sesBuffer += base64
         const sesContent = atob(sesBuffer)
         const boardData = parseSes(sesContent)
         dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
         sesBuffer = ''
       } catch {
-        // Keep buffer for next chunk if this one is partial
         if (sesBuffer.length > 5_000_000) sesBuffer = ''
       }
     })
 
     const poll = setInterval(async () => {
       try {
-        const status = await getJobStatus(job.id)
+        const status = await getJobStatus(jobId)
         dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
         if (status.state === 'COMPLETED' && !outputFetchedRef.current) {
           outputFetchedRef.current = true
           try {
-            const output = await getJobOutput(job.id)
+            const output = await getJobOutput(jobId)
             const sesContent = atob(output.data)
             const boardData = parseSes(sesContent)
             dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
+            log('Info', 'Final routing output merged')
           } catch (err) {
             console.error('Failed to fetch final SES output:', err)
           }
@@ -86,6 +71,54 @@ export default function MenuBar() {
         if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
       } catch { /* ignore */ }
     }, 2000)
+  }
+
+  const loadDsnFromContent = async (content: string, fileName: string) => {
+    outputFetchedRef.current = false
+    try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
+
+    dispatch({ type: 'RESET' })
+    log('Info', `Loading design: ${fileName}`)
+
+    const initialBoard = parseDsn(content)
+    dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
+    log('Info', `Parsed DSN: ${initialBoard.components.length} components, ${initialBoard.traces.length} traces, ${initialBoard.vias.length} vias`)
+
+    log('Info', 'Creating FreeRouting session...')
+    const session = await createSession()
+    dispatch({ type: 'SET_SESSION', sessionId: session.id })
+    log('Info', `Session created: ${session.id}`)
+
+    const job = await createJob(session.id)
+    dispatch({ type: 'SET_JOB', jobId: job.id })
+    log('Info', `Job enqueued: ${job.id}`)
+
+    log('Info', 'Uploading DSN to backend...')
+    await uploadDsn(job.id, fileName, content)
+    log('Info', 'DSN uploaded. Ready to route.')
+  }
+
+  const handleStartRouting = async () => {
+    if (!state.jobId) return
+    log('Info', 'Starting autorouting...')
+    try {
+      await startRouting(state.jobId)
+      log('Info', 'Autorouting started')
+      setupRoutingStreams(state.jobId)
+    } catch (err) {
+      log('Error', `Failed to start routing: ${err}`)
+    }
+  }
+
+  const handleStopRouting = async () => {
+    if (!state.jobId) return
+    log('Info', 'Stopping autorouting...')
+    try {
+      await cancelRouting(state.jobId)
+      log('Info', 'Stop request sent')
+    } catch (err) {
+      log('Error', `Failed to stop routing: ${err}`)
+    }
   }
 
   const handleOpenDsn = async () => {
@@ -155,6 +188,15 @@ export default function MenuBar() {
           <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
             Open DSN
           </button>
+          {state.jobState === 'RUNNING' ? (
+            <button style={{ ...s.btn, background: '#a91d3a' }} onClick={handleStopRouting}>
+              停止布线
+            </button>
+          ) : (
+            <button style={{ ...s.btn, background: '#1b9e4a' }} onClick={handleStartRouting} disabled={!state.jobId}>
+              自动布线
+            </button>
+          )}
           <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
             Export SES
           </button>
