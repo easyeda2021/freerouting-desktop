@@ -49,26 +49,28 @@ export default function MenuBar() {
       mergeTimerRef.current = window.setTimeout(flushMerge, 500)
     }
 
-    const startOutputAndPolling = () => {
-      let sesBuffer = ''
-      streamOutput(jobId, (data) => {
-        try {
-          let base64 = data
-          if (data.trimStart().startsWith('{')) {
-            const parsed = JSON.parse(data)
-            base64 = parsed.data || parsed.output || parsed.ses || ''
-          }
-          if (!base64) return
-          sesBuffer += base64
-          const sesContent = atob(sesBuffer)
-          const boardData = parseSes(sesContent)
-          scheduleMerge(boardData)
-          sesBuffer = ''
-        } catch {
-          if (sesBuffer.length > 5_000_000) sesBuffer = ''
+    // Stream output updates as soon as they are available
+    let sesBuffer = ''
+    streamOutput(jobId, (data) => {
+      try {
+        let base64 = data
+        if (data.trimStart().startsWith('{')) {
+          const parsed = JSON.parse(data)
+          base64 = parsed.data || parsed.output || parsed.ses || ''
         }
-      })
+        if (!base64) return
+        sesBuffer += base64
+        const sesContent = atob(sesBuffer)
+        const boardData = parseSes(sesContent)
+        scheduleMerge(boardData)
+        sesBuffer = ''
+      } catch {
+        if (sesBuffer.length > 5_000_000) sesBuffer = ''
+      }
+    })
 
+    // Start polling for routing results 5s after routing begins
+    setTimeout(() => {
       const poll = setInterval(async () => {
         try {
           const status = await getJobStatus(jobId)
@@ -92,10 +94,7 @@ export default function MenuBar() {
           if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
         } catch { /* ignore */ }
       }, 2000)
-    }
-
-    // Start requesting routing results 5s after routing begins to reduce load
-    setTimeout(startOutputAndPolling, 5000)
+    }, 5000)
   }
 
   const loadDsnFromContent = async (content: string, fileName: string) => {
