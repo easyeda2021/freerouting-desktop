@@ -6,7 +6,7 @@ Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host dete
 
 ## Download
 
-You can download the file at [build](./build) 
+You can download the file at [Release](https://github.com/easyeda2021/freerouting-desktop/releases) 
 
 ## Architecture
 
