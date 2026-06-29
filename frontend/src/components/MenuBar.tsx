@@ -3,7 +3,7 @@ import { useApp } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, cancelRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
-import type { LogEntry } from '../lib/board-types'
+import type { BoardData, LogEntry } from '../lib/board-types'
 
 declare global {
   interface Window {
@@ -21,6 +21,8 @@ export default function MenuBar() {
   const { state, dispatch } = useApp()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const outputFetchedRef = useRef(false)
+  const pendingMergeRef = useRef<BoardData | null>(null)
+  const mergeTimerRef = useRef<number | null>(null)
 
   const log = (type: 'Info' | 'Warn' | 'Error', message: string, topic = 'App') => {
     dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type, message, topic } })
@@ -33,48 +35,76 @@ export default function MenuBar() {
       if (match) dispatch({ type: 'SET_SCORE', score: parseFloat(match[1]) })
     })
 
-    let sesBuffer = ''
-    streamOutput(jobId, (data) => {
-      try {
-        let base64 = data
-        if (data.trimStart().startsWith('{')) {
-          const parsed = JSON.parse(data)
-          base64 = parsed.data || parsed.output || parsed.ses || ''
-        }
-        if (!base64) return
-        sesBuffer += base64
-        const sesContent = atob(sesBuffer)
-        const boardData = parseSes(sesContent)
-        dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
-        sesBuffer = ''
-      } catch {
-        if (sesBuffer.length > 5_000_000) sesBuffer = ''
+    const flushMerge = () => {
+      mergeTimerRef.current = null
+      if (pendingMergeRef.current) {
+        dispatch({ type: 'MERGE_BOARD_DATA', data: pendingMergeRef.current })
+        pendingMergeRef.current = null
       }
-    })
+    }
 
-    const poll = setInterval(async () => {
-      try {
-        const status = await getJobStatus(jobId)
-        dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
-        if (status.state === 'COMPLETED' && !outputFetchedRef.current) {
-          outputFetchedRef.current = true
-          try {
-            const output = await getJobOutput(jobId)
-            const sesContent = atob(output.data)
-            const boardData = parseSes(sesContent)
-            dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
-            log('Info', 'Final routing output merged')
-          } catch (err) {
-            console.error('Failed to fetch final SES output:', err)
+    const scheduleMerge = (data: BoardData) => {
+      pendingMergeRef.current = data
+      if (mergeTimerRef.current) return
+      mergeTimerRef.current = window.setTimeout(flushMerge, 500)
+    }
+
+    const startOutputAndPolling = () => {
+      let sesBuffer = ''
+      streamOutput(jobId, (data) => {
+        try {
+          let base64 = data
+          if (data.trimStart().startsWith('{')) {
+            const parsed = JSON.parse(data)
+            base64 = parsed.data || parsed.output || parsed.ses || ''
           }
+          if (!base64) return
+          sesBuffer += base64
+          const sesContent = atob(sesBuffer)
+          const boardData = parseSes(sesContent)
+          scheduleMerge(boardData)
+          sesBuffer = ''
+        } catch {
+          if (sesBuffer.length > 5_000_000) sesBuffer = ''
         }
-        if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
-      } catch { /* ignore */ }
-    }, 2000)
+      })
+
+      const poll = setInterval(async () => {
+        try {
+          const status = await getJobStatus(jobId)
+          dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
+          if (status.state === 'COMPLETED' && !outputFetchedRef.current) {
+            outputFetchedRef.current = true
+            if (mergeTimerRef.current) {
+              clearTimeout(mergeTimerRef.current)
+              flushMerge()
+            }
+            try {
+              const output = await getJobOutput(jobId)
+              const sesContent = atob(output.data)
+              const boardData = parseSes(sesContent)
+              dispatch({ type: 'MERGE_BOARD_DATA', data: boardData })
+              log('Info', 'Final routing output merged')
+            } catch (err) {
+              console.error('Failed to fetch final SES output:', err)
+            }
+          }
+          if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
+        } catch { /* ignore */ }
+      }, 2000)
+    }
+
+    // Start requesting routing results 5s after routing begins to reduce load
+    setTimeout(startOutputAndPolling, 5000)
   }
 
   const loadDsnFromContent = async (content: string, fileName: string) => {
     outputFetchedRef.current = false
+    pendingMergeRef.current = null
+    if (mergeTimerRef.current) {
+      clearTimeout(mergeTimerRef.current)
+      mergeTimerRef.current = null
+    }
     try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
 
     dispatch({ type: 'RESET' })
@@ -199,6 +229,9 @@ export default function MenuBar() {
           <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
             Open DSN
           </button>
+          <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
+            Export SES
+          </button>
           {state.jobState === 'RUNNING' ? (
             <button style={s.btn} onClick={handleStopRouting}>
               Stop Routing
@@ -208,9 +241,6 @@ export default function MenuBar() {
               Route
             </button>
           )}
-          <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
-            Export SES
-          </button>
         </div>
         <span style={s.fileName}>{state.currentDsn || ''}</span>
       </div>
