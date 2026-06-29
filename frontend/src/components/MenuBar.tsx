@@ -20,8 +20,10 @@ declare global {
 export default function MenuBar() {
   const { state, dispatch } = useApp()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const outputFetchedRef = useRef(false)
 
   const loadDsnFromContent = async (content: string, fileName: string) => {
+    outputFetchedRef.current = false
     try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
 
     dispatch({ type: 'RESET' })
@@ -70,6 +72,17 @@ export default function MenuBar() {
       try {
         const status = await getJobStatus(job.id)
         dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
+        if (status.state === 'COMPLETED' && !outputFetchedRef.current) {
+          outputFetchedRef.current = true
+          try {
+            const output = await getJobOutput(job.id)
+            const sesContent = atob(output.data)
+            const boardData = parseSes(sesContent)
+            dispatch({ type: 'SET_BOARD_DATA', data: boardData })
+          } catch (err) {
+            console.error('Failed to fetch final SES output:', err)
+          }
+        }
         if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
       } catch { /* ignore */ }
     }, 2000)

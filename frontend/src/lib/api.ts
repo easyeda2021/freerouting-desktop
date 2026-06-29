@@ -75,9 +75,15 @@ export function streamLogs(jobId: string, onLog: (log: { timestamp: string; type
 export function streamOutput(jobId: string, onOutput: (data: string) => void) {
   streamSSE(`${PROXY_BASE}/v1/jobs/${jobId}/output/stream`, (data) => {
     try {
-      const parsed = JSON.parse(data)
-      if (parsed.data) onOutput(parsed.data)
-    } catch { /* ignore parse errors */ }
+      // Some endpoints wrap the payload in {"data":"base64..."}
+      if (data.trimStart().startsWith('{')) {
+        const parsed = JSON.parse(data)
+        if (parsed.data) onOutput(parsed.data)
+        return
+      }
+    } catch { /* not a JSON wrapper */ }
+    // Otherwise pass through raw payload (base64 or plain text)
+    if (data) onOutput(data)
   })
 }
 

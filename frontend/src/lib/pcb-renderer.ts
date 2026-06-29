@@ -40,6 +40,9 @@ export function createPcbRenderer(container: HTMLElement) {
     try {
       clear()
 
+      const bounds = computeBounds(data)
+      const outlineWidth = Math.max(bounds.maxDim * 0.002, 1)
+
       // Group traces by layer
       for (const trace of data.traces) {
         if (visibility[trace.layer] === false) continue
@@ -51,11 +54,12 @@ export function createPcbRenderer(container: HTMLElement) {
           layerGroups.set(trace.layer, group)
           app.tree.add(group)
         }
+        const isOutline = trace.netName === ''
         group.add(
           new Line({
             points,
-            strokeWidth: Math.max(trace.width, 0.5),
-            stroke: getLayerColor(trace.layer),
+            strokeWidth: isOutline ? outlineWidth : Math.max(trace.width, 0.5),
+            stroke: isOutline ? '#e0e0e0' : getLayerColor(trace.layer),
             strokeCap: 'round',
             strokeJoin: 'round',
           })
@@ -204,6 +208,29 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
         group.add(capsule)
       }
     }
+  }
+}
+
+function computeBounds(data: BoardData) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  function expand(x: number, y: number) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    if (x < minX) minX = x
+    if (y < minY) minY = y
+    if (x > maxX) maxX = x
+    if (y > maxY) maxY = y
+  }
+  for (const trace of data.traces) {
+    for (const [x, y] of trace.corners) expand(x, y)
+  }
+  for (const via of data.vias) expand(via.center[0], via.center[1])
+  for (const comp of data.components) expand(comp.location[0], comp.location[1])
+  if (!Number.isFinite(minX)) {
+    minX = 0; minY = 0; maxX = 1000; maxY = 1000
+  }
+  return {
+    minX, minY, maxX, maxY,
+    maxDim: Math.max(maxX - minX, maxY - minY, 1),
   }
 }
 
