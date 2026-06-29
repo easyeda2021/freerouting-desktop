@@ -1,22 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../App'
 
+// ponytail: Go w.Bind() returns Promise in JS, must await
+async function getFRStatus() {
+  const raw = await window.checkFRStatus()
+  return JSON.parse(raw)
+}
+
 export default function SetupWizard() {
   const { state, dispatch } = useApp()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     async function check() {
       try {
-        const raw = window.checkFRStatus()
-        const status = JSON.parse(raw)
+        const status = await getFRStatus()
+        if (cancelled) return
         dispatch({ type: 'SET_FR_STATUS', payload: status })
 
         if (status.status === 'not-installed') {
           window.downloadFR()
 
-          const poll = setInterval(() => {
-            const s = JSON.parse(window.checkFRStatus())
+          const poll = setInterval(async () => {
+            const s = await getFRStatus()
+            if (cancelled) { clearInterval(poll); return }
             dispatch({ type: 'SET_FR_STATUS', payload: s })
             if (s.status === 'ready') {
               clearInterval(poll)
@@ -37,6 +46,7 @@ export default function SetupWizard() {
       }
     }
     check()
+    return () => { cancelled = true }
   }, [])
 
   const startFRProcess = () => {
@@ -48,7 +58,7 @@ export default function SetupWizard() {
         try {
           const res = await fetch('http://127.0.0.1:9080/v1/system/status')
           if (res.ok) {
-            const s = JSON.parse(window.checkFRStatus())
+            const s = await getFRStatus()
             dispatch({ type: 'SET_FR_STATUS', payload: s })
             clearInterval(poll)
           }
@@ -94,36 +104,13 @@ export default function SetupWizard() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.85)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    background: '#16213e',
-    borderRadius: 12,
-    padding: '40px 48px',
-    textAlign: 'center' as const,
-    minWidth: 400,
-    border: '1px solid #0f3460',
-  },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modal: { background: '#16213e', borderRadius: 12, padding: '40px 48px', textAlign: 'center' as const, minWidth: 400, border: '1px solid #0f3460' },
   title: { color: '#e94560', marginBottom: 24, fontSize: 20 },
   text: { color: '#aaa', marginBottom: 16, fontSize: 14 },
   progressBar: { height: 6, background: '#0f3460', borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', background: '#e94560', transition: 'width 0.3s' },
   progressText: { color: '#888', fontSize: 12 },
   error: { marginTop: 16 },
-  retryBtn: {
-    marginTop: 8,
-    padding: '6px 20px',
-    border: '1px solid #0f3460',
-    borderRadius: 4,
-    background: '#e94560',
-    color: '#fff',
-    cursor: 'pointer',
-  },
+  retryBtn: { marginTop: 8, padding: '6px 20px', border: '1px solid #0f3460', borderRadius: 4, background: '#e94560', color: '#fff', cursor: 'pointer' },
 }

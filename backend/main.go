@@ -24,24 +24,20 @@ var (
 )
 
 func main() {
-	home, _ := os.UserHomeDir()
-	logPath := home + "/freerouting-desktop.log"
-	logFile, _ := os.Create(logPath)
+	logFile, _ := os.Create(os.TempDir() + "/fr.log")
 	writers := []io.Writer{os.Stderr}
 	if logFile != nil {
 		writers = append(writers, logFile)
+		defer logFile.Close()
 	}
 	log.SetOutput(io.MultiWriter(writers...))
+
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("PANIC: %v\n%s", r, debug.Stack())
 		}
-		if logFile != nil {
-			logFile.Close()
-		}
 	}()
 
-	log.SetFlags(log.Ltime)
 	log.Printf("FreeRouting Desktop %s (%s)", version, platform)
 
 	go startCORSProxy()
@@ -54,21 +50,25 @@ func main() {
 		os.Exit(0)
 	}()
 
+	// Step 1: verify embed
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
-		log.Printf("embed error: %v", err)
+		log.Printf("FATAL: embed error: %v", err)
 		return
 	}
-	log.Println("Embed OK, starting HTTP...")
+	log.Println("Step 1: embed OK")
 
+	// Step 2: start HTTP server
 	fmux := http.NewServeMux()
 	fmux.Handle("/", http.FileServer(http.FS(sub)))
 	go http.ListenAndServe("127.0.0.1:1421", fmux)
-	time.Sleep(100 * time.Millisecond)
-	log.Println("HTTP server started, creating WebView...")
+	time.Sleep(200 * time.Millisecond)
+	log.Println("Step 2: HTTP server started")
 
+	// Step 3: create WebView
+	log.Println("Step 3: creating WebView...")
 	w := webview.New(false)
-	log.Println("WebView created")
+	log.Println("Step 3: WebView created OK")
 	defer w.Destroy()
 
 	w.SetTitle("FreeRouting Desktop " + version)
@@ -83,16 +83,9 @@ func main() {
 	w.Bind("readFile", readFile)
 	w.Bind("writeFile", writeFile)
 
-	devMode := os.Getenv("FR_DEV") == "1"
-	if devMode {
-		log.Println("Dev: http://localhost:1420")
-		w.Navigate("http://localhost:1420")
-	} else {
-		log.Println("Prod: http://127.0.0.1:1421")
-		w.Navigate("http://127.0.0.1:1421")
-	}
-
-	log.Println("Calling w.Run()...")
+	log.Println("Step 4: navigating...")
+	w.Navigate("http://127.0.0.1:1421")
+	log.Println("Step 5: running...")
 	w.Run()
 	log.Println("Exited.")
 }
