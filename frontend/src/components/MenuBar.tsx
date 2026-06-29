@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useApp } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
+import { parseDsn } from '../lib/dsn-parser'
 import type { LogEntry } from '../lib/board-types'
 
 declare global {
@@ -33,6 +34,13 @@ export default function MenuBar() {
       const content = await file.text()
       if (!content) return
 
+      dispatch({ type: 'RESET' })
+
+      // Parse and render DSN immediately
+      const initialBoard = parseDsn(content)
+      dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
+
+      // Then upload to FreeRouting for routing
       const session = await createSession()
       dispatch({ type: 'SET_SESSION', sessionId: session.id })
 
