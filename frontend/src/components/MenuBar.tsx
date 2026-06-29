@@ -103,9 +103,11 @@ export default function MenuBar() {
           Export SES
         </button>
       </div>
-      <span style={s.version}>
-        FreeRouting {state.frStatus === 'ready' ? `v${state.frVersion || '?'}` : state.frStatus}
-      </span>
+      {state.frStatus === 'ready' ? (
+        <span style={s.connected}>FreeRouting Connected</span>
+      ) : (
+        <span style={s.version}>{state.frStatus}</span>
+      )}
     </div>
   )
 }
@@ -113,6 +115,7 @@ export default function MenuBar() {
 const s: Record<string, React.CSSProperties> = {
   bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
   left: { display: 'flex', alignItems: 'center', gap: 6 },
-  btn: { padding: '4px 14px', border: 'none', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
+  btn: { padding: '4px 14px', border: '1px solid #888', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
+  connected: { fontSize: 12, color: '#fff', background: '#1b9e4a', padding: '3px 10px', borderRadius: 10, fontWeight: 500 },
   version: { fontSize: 12, color: '#888' },
 }
