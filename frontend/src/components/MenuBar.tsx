@@ -82,8 +82,7 @@ export default function MenuBar() {
 
   return (
     <div style={s.bar}>
-      <span style={s.brand}>FreeRouting Desktop</span>
-      <div style={s.menu}>
+      <div style={s.left}>
         <input ref={fileInputRef} type="file" accept=".dsn" style={{ display: 'none' }} onChange={onFileSelected} />
         <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
           Open DSN
@@ -91,18 +90,17 @@ export default function MenuBar() {
         <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
           Export SES
         </button>
-        <span style={s.status}>
-          FR: {state.frStatus === 'ready' ? `v${state.frVersion || '?'}` : state.frStatus}
-        </span>
       </div>
+      <span style={s.version}>
+        FreeRouting {state.frStatus === 'ready' ? `v${state.frVersion || '?'}` : state.frStatus}
+      </span>
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
   bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
-  brand: { fontWeight: 700, fontSize: 14, color: '#e94560' },
-  menu: { display: 'flex', alignItems: 'center', gap: 8 },
-  btn: { padding: '4px 12px', border: '1px solid #0f3460', borderRadius: 4, background: '#1a1a2e', color: '#e0e0e0', cursor: 'pointer', fontSize: 12 },
-  status: { fontSize: 11, color: '#888', marginLeft: 16 },
+  left: { display: 'flex', alignItems: 'center', gap: 6 },
+  btn: { padding: '4px 14px', border: 'none', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500 },
+  version: { fontSize: 12, color: '#888' },
 }
