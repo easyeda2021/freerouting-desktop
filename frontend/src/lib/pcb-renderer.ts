@@ -88,11 +88,67 @@ export function createPcbRenderer(container: HTMLElement) {
         )
       }
 
-      // Render pads from library images + padstacks, colored by layer
-      const padGroup = new Group({})
-      app.tree.add(padGroup)
+      // Render component body outlines behind pads so pads remain visible
+      const compGroup = new Group({})
+      app.tree.add(compGroup)
       const padstackMap = new Map(data.padstacks.map((ps) => [ps.name, ps]))
       const imageMap = new Map(data.images.map((img) => [img.name, img]))
+      for (const comp of data.components) {
+        if (Number.isNaN(comp.location[0]) || Number.isNaN(comp.location[1])) continue
+        const image = imageMap.get(comp.package)
+        const marker = new Group({
+          x: comp.location[0],
+          y: comp.location[1],
+          rotation: comp.rotation,
+        })
+        if (image && image.outlines.length > 0) {
+          for (const outline of image.outlines) {
+            const points = outline.corners.flat()
+            if (points.some(Number.isNaN)) continue
+            marker.add(
+              new Line({
+                points,
+                strokeWidth: Math.max(outline.width, 0.5),
+                stroke: comp.side === 'back' ? '#909090' : '#c0c0c0',
+                strokeCap: 'round',
+                strokeJoin: 'round',
+              })
+            )
+          }
+        } else {
+          // Fall back to a faint pin-bounding-box marker
+          let minX = -100, minY = -100, maxX = 100, maxY = 100
+          if (image && image.pins.length > 0) {
+            minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity
+            for (const pin of image.pins) {
+              const p = rotatePoint(pin.x, pin.y, comp.rotation + pin.rotation)
+              if (p.x < minX) minX = p.x
+              if (p.y < minY) minY = p.y
+              if (p.x > maxX) maxX = p.x
+              if (p.y > maxY) maxY = p.y
+            }
+            if (!Number.isFinite(minX)) {
+              minX = -100; minY = -100; maxX = 100; maxY = 100
+            }
+          }
+          marker.add(
+            new Rect({
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+              fill: 'transparent',
+              stroke: comp.side === 'back' ? '#808080' : '#a0a0a0',
+              strokeWidth: Math.max(bounds.maxDim * 0.0005, 0.5),
+            })
+          )
+        }
+        compGroup.add(marker)
+      }
+
+      // Render pads from library images + padstacks, colored by layer, on top of outlines
+      const padGroup = new Group({})
+      app.tree.add(padGroup)
       for (const comp of data.components) {
         if (Number.isNaN(comp.location[0]) || Number.isNaN(comp.location[1])) continue
         const image = imageMap.get(comp.package)
@@ -115,44 +171,6 @@ export function createPcbRenderer(container: HTMLElement) {
             padGroup.add(g)
           }
         }
-      }
-
-      // Render component body markers (outline from pin bounding box)
-      const compGroup = new Group({})
-      app.tree.add(compGroup)
-      for (const comp of data.components) {
-        if (Number.isNaN(comp.location[0]) || Number.isNaN(comp.location[1])) continue
-        const image = imageMap.get(comp.package)
-        let minX = -100, minY = -100, maxX = 100, maxY = 100
-        if (image && image.pins.length > 0) {
-          minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity
-          for (const pin of image.pins) {
-            const p = rotatePoint(pin.x, pin.y, comp.rotation + pin.rotation)
-            if (p.x < minX) minX = p.x
-            if (p.y < minY) minY = p.y
-            if (p.x > maxX) maxX = p.x
-            if (p.y > maxY) maxY = p.y
-          }
-          if (!Number.isFinite(minX)) {
-            minX = -100; minY = -100; maxX = 100; maxY = 100
-          }
-        }
-        const rect = new Rect({
-          x: minX,
-          y: minY,
-          width: maxX - minX,
-          height: maxY - minY,
-          fill: 'transparent',
-          stroke: comp.side === 'back' ? '#a0a0a0' : '#e0e0e0',
-          strokeWidth: Math.max(bounds.maxDim * 0.001, 1),
-          rotation: comp.rotation,
-        })
-        const marker = new Group({
-          x: comp.location[0],
-          y: comp.location[1],
-        })
-        marker.add(rect)
-        compGroup.add(marker)
       }
 
       // Auto-fit after layout
@@ -247,10 +265,10 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
         const capsule = new Group({ x: cx, y: cy, rotation: angle })
         capsule.add(
           new Ellipse({
-            x: -width / 2,
-            y: -(length + width) / 2,
-            width,
-            height: length + width,
+            x: -(length + width) / 2,
+            y: -width / 2,
+            width: length + width,
+            height: width,
             fill: color,
             stroke: darken(color),
             strokeWidth: Math.max(width * 0.04, 1),

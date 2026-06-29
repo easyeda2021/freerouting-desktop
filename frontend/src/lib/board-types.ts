@@ -39,9 +39,15 @@ export interface PinData {
   rotation: number
 }
 
+export interface OutlineData {
+  width: number
+  corners: [number, number][]
+}
+
 export interface ImageData {
   name: string
   pins: PinData[]
+  outlines: OutlineData[]
 }
 
 export interface PadstackData {

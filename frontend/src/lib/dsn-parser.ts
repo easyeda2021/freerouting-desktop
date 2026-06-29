@@ -1,4 +1,4 @@
-import type { BoardData, ViaData, PinData, ShapeData } from './board-types'
+import type { BoardData, ViaData, PinData, ShapeData, OutlineData } from './board-types'
 
 type Token =
   | { type: 'open' }
@@ -323,23 +323,36 @@ export function parseDsn(content: string): BoardData {
       if (item[0] === 'image') {
         const imageName = String(item[1])
         const pins: PinData[] = []
+        const outlines: OutlineData[] = []
         for (const sub of item.slice(2)) {
-          if (!Array.isArray(sub) || sub[0] !== 'pin') continue
-          let rotation = 0
-          let pinNumberIdx = 2
-          if (Array.isArray(sub[2]) && (sub[2] as SExpr[])[0] === 'rotate') {
-            rotation = Number((sub[2] as SExpr[])[1])
-            pinNumberIdx = 3
+          if (!Array.isArray(sub)) continue
+          if (sub[0] === 'pin') {
+            let rotation = 0
+            let pinNumberIdx = 2
+            if (Array.isArray(sub[2]) && (sub[2] as SExpr[])[0] === 'rotate') {
+              rotation = Number((sub[2] as SExpr[])[1])
+              pinNumberIdx = 3
+            }
+            pins.push({
+              padstackName: String(sub[1]),
+              pinNumber: String(sub[pinNumberIdx]),
+              x: Number(sub[pinNumberIdx + 1]),
+              y: Number(sub[pinNumberIdx + 2]),
+              rotation,
+            })
+          } else if (sub[0] === 'outline') {
+            const pathDef = sub[1]
+            if (Array.isArray(pathDef) && pathDef[0] === 'path') {
+              const width = Number(pathDef[2])
+              const corners: [number, number][] = []
+              for (let i = 3; i < pathDef.length - 1; i += 2) {
+                corners.push([Number(pathDef[i]), Number(pathDef[i + 1])])
+              }
+              if (corners.length >= 2) outlines.push({ width, corners })
+            }
           }
-          pins.push({
-            padstackName: String(sub[1]),
-            pinNumber: String(sub[pinNumberIdx]),
-            x: Number(sub[pinNumberIdx + 1]),
-            y: Number(sub[pinNumberIdx + 2]),
-            rotation,
-          })
         }
-        boardData.images.push({ name: imageName, pins })
+        boardData.images.push({ name: imageName, pins, outlines })
       } else if (item[0] === 'padstack') {
         const padstackName = String(item[1])
         const shapes: ShapeData[] = []
