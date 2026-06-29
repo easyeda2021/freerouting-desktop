@@ -66,7 +66,8 @@ export async function cancelRouting(jobId: string): Promise<void> {
 export function streamLogs(jobId: string, onLog: (log: { timestamp: string; type: string; message: string; topic: string }) => void) {
   streamSSE(`${PROXY_BASE}/v1/jobs/${jobId}/logs/stream`, (data) => {
     try {
-      onLog(JSON.parse(data))
+      const parsed = JSON.parse(data)
+      if (parsed && typeof parsed === 'object') onLog(parsed)
     } catch { /* ignore parse errors */ }
   })
 }

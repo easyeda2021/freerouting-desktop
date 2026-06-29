@@ -74,6 +74,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, boardData: action.data, layerVisibility: visibility }
     }
     case 'ADD_LOG':
+      if (!action.entry || typeof action.entry !== 'object') return state
       return { ...state, logEntries: [...state.logEntries.slice(-999), action.entry] }
     case 'SET_SCORE':
       return { ...state, score: action.score }
