@@ -7,6 +7,11 @@ on:
         description: 'Version tag (e.g. v0.0.22)'
         required: true
         type: string
+      create_release:
+        description: 'Create/update release for this version'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -108,3 +113,22 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: build/${{ env.ARTIFACT_NAME }}
           if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event.inputs.create_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          files: artifacts/*
