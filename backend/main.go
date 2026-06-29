@@ -74,7 +74,7 @@ func main() {
 	defer w.Destroy()
 
 	w.SetTitle("FreeRouting Desktop " + version)
-	w.SetSize(1400, 900, webview.HintNone)
+	w.SetSize(1600, 1000, webview.HintNone)
 	centerWindow(w)
 
 	w.Bind("checkFreeRoutingStatus", checkFreeRoutingStatus)
@@ -111,7 +111,7 @@ func centerWindow(w webview.WebView) {
 			if hwnd == 0 {
 				continue
 			}
-			setWindowCenter(hwnd, 1400, 900)
+			setWindowCenter(hwnd, 1600, 1000)
 			return
 		}
 	}()

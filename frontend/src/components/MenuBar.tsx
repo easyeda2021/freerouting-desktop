@@ -17,14 +17,15 @@ declare global {
 export default function MenuBar() {
   const { state, dispatch } = useApp()
 
-  const handleOpenDsn = async () => {
-    // Use hidden HTML input for reliable file picker in WebView2
+  const handleOpenDsn = () => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.dsn'
+    input.style.display = 'none'
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
+      document.body.removeChild(input)
 
       try {
         const content = await file.text()
@@ -32,20 +33,16 @@ export default function MenuBar() {
 
         dispatch({ type: 'RESET' })
 
-        // Parse and render DSN immediately
         const initialBoard = parseDsn(content)
         dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
 
-        const fileName = file.name
-
-        // Then upload to FreeRouting for routing
         const session = await createSession()
         dispatch({ type: 'SET_SESSION', sessionId: session.id })
 
         const job = await createJob(session.id)
         dispatch({ type: 'SET_JOB', jobId: job.id })
 
-        await uploadDsn(job.id, fileName, content)
+        await uploadDsn(job.id, file.name, content)
         await startRouting(job.id)
 
         streamLogs(job.id, (log) => {
@@ -73,6 +70,7 @@ export default function MenuBar() {
         dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
       }
     }
+    document.body.appendChild(input)
     input.click()
   }
 
