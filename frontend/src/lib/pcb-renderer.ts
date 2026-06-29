@@ -92,28 +92,37 @@ export function createPcbRenderer(container: HTMLElement) {
         )
       }
 
+      // Determine top/bottom layer names for back-side component flipping
+      const topLayer = data.layers[0]?.name
+      const bottomLayer = data.layers[data.layers.length - 1]?.name
+
+      const padstackMap = new Map(data.padstacks.map((ps) => [ps.name, ps]))
+      const imageMap = new Map(data.images.map((img) => [img.name, img]))
+
       // Render component body outlines behind pads so pads remain visible
       const compGroup = new Group({})
       app.tree.add(compGroup)
-      const padstackMap = new Map(data.padstacks.map((ps) => [ps.name, ps]))
-      const imageMap = new Map(data.images.map((img) => [img.name, img]))
       for (const comp of data.components) {
         if (Number.isNaN(comp.location[0]) || Number.isNaN(comp.location[1])) continue
         const image = imageMap.get(comp.package)
+        const isBack = comp.side === 'back'
         const marker = new Group({
           x: comp.location[0],
           y: comp.location[1],
           rotation: comp.rotation,
         })
+        // Back-side components are mirrored horizontally around their center
+        const content = new Group({ scaleX: isBack ? -1 : 1 })
+        marker.add(content)
         if (image && image.outlines.length > 0) {
           for (const outline of image.outlines) {
             const points = outline.corners.flat()
             if (points.some(Number.isNaN)) continue
-            marker.add(
+            content.add(
               new Line({
                 points,
                 strokeWidth: Math.max(outline.width, 0.5),
-                stroke: comp.side === 'back' ? '#909090' : '#c0c0c0',
+                stroke: isBack ? '#909090' : '#c0c0c0',
                 strokeCap: 'round',
                 strokeJoin: 'round',
               })
@@ -125,24 +134,23 @@ export function createPcbRenderer(container: HTMLElement) {
           if (image && image.pins.length > 0) {
             minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity
             for (const pin of image.pins) {
-              const p = rotatePoint(pin.x, pin.y, comp.rotation + pin.rotation)
-              if (p.x < minX) minX = p.x
-              if (p.y < minY) minY = p.y
-              if (p.x > maxX) maxX = p.x
-              if (p.y > maxY) maxY = p.y
+              if (pin.x < minX) minX = pin.x
+              if (pin.y < minY) minY = pin.y
+              if (pin.x > maxX) maxX = pin.x
+              if (pin.y > maxY) maxY = pin.y
             }
             if (!Number.isFinite(minX)) {
               minX = -100; minY = -100; maxX = 100; maxY = 100
             }
           }
-          marker.add(
+          content.add(
             new Rect({
               x: minX,
               y: minY,
               width: maxX - minX,
               height: maxY - minY,
               fill: 'transparent',
-              stroke: comp.side === 'back' ? '#808080' : '#a0a0a0',
+              stroke: isBack ? '#808080' : '#a0a0a0',
               strokeWidth: Math.max(bounds.maxDim * 0.0005, 0.5),
             })
           )
@@ -157,24 +165,47 @@ export function createPcbRenderer(container: HTMLElement) {
         if (Number.isNaN(comp.location[0]) || Number.isNaN(comp.location[1])) continue
         const image = imageMap.get(comp.package)
         if (!image) continue
+        const isBack = comp.side === 'back'
+        const compBase = new Group({
+          x: comp.location[0],
+          y: comp.location[1],
+          rotation: comp.rotation,
+        })
+        const content = new Group({ scaleX: isBack ? -1 : 1 })
+        compBase.add(content)
         for (const pin of image.pins) {
           const padstack = padstackMap.get(pin.padstackName)
           if (!padstack) continue
-          const pinPos = rotatePoint(pin.x, pin.y, comp.rotation)
-          const absX = comp.location[0] + pinPos.x
-          const absY = comp.location[1] + pinPos.y
           for (const shape of padstack.shapes) {
-            if (visibility[shape.layer] === false) continue
-            const color = getLayerColor(shape.layer)
+            let layer = shape.layer
+            if (isBack && topLayer && bottomLayer && topLayer !== bottomLayer) {
+              // Back-side components live on the bottom; flip top/bottom copper layers
+              if (layer === topLayer) {
+                layer = bottomLayer
+              } else if (layer === bottomLayer) {
+                layer = topLayer
+              } else {
+                // Heuristic for alternate naming like top_copper / bottom_copper
+                const lower = layer.toLowerCase()
+                if (lower.includes('top') && !lower.includes('bottom')) {
+                  layer = bottomLayer
+                } else if (lower.includes('bottom') && !lower.includes('top')) {
+                  layer = topLayer
+                }
+              }
+            }
+            if (visibility[layer] === false) continue
+            const color = getLayerColor(layer)
             const g = new Group({
-              x: absX,
-              y: absY,
-              rotation: comp.rotation + pin.rotation,
+              x: pin.x,
+              y: pin.y,
+              rotation: pin.rotation,
             })
             renderShape(shape, g, color)
-            padGroup.add(g)
+            content.add(g)
           }
         }
+        padGroup.add(compBase)
       }
 
     } catch (e) {
@@ -343,13 +374,6 @@ function computeBounds(data: BoardData) {
     minX, minY, maxX, maxY,
     maxDim: Math.max(maxX - minX, maxY - minY, 1),
   }
-}
-
-function rotatePoint(x: number, y: number, angleDeg: number) {
-  const rad = (angleDeg * Math.PI) / 180
-  const cos = Math.cos(rad)
-  const sin = Math.sin(rad)
-  return { x: x * cos - y * sin, y: x * sin + y * cos }
 }
 
 function getLayerColor(layerName: string): string {
