@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -261,6 +262,7 @@ func init() {
 
 func openFileDialog() string {
 	path, err := openNativeFileDialog()
+	log.Printf("openFileDialog native returned path=%q err=%v", path, err)
 	if err != nil {
 		return ""
 	}
@@ -272,6 +274,7 @@ func openFileDialog() string {
 
 func saveFileDialog(defaultName string) string {
 	path, err := saveNativeFileDialog(defaultName)
+	log.Printf("saveFileDialog native returned path=%q err=%v", path, err)
 	if err != nil {
 		return ""
 	}

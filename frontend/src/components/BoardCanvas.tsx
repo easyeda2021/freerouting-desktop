@@ -9,6 +9,7 @@ export default function BoardCanvas() {
   const isDragging = useRef(false)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
   const hasFittedRef = useRef(false)
+  const prevDsnRef = useRef<string | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -95,19 +96,22 @@ export default function BoardCanvas() {
 
   useEffect(() => {
     if (state.boardData && rendererRef.current) {
+      const isNewDsn = prevDsnRef.current !== state.currentDsn
       try {
         rendererRef.current.render(state.boardData, state.layerVisibility)
-        if (!hasFittedRef.current) {
+        if (isNewDsn || !hasFittedRef.current) {
           rendererRef.current.fitView()
           hasFittedRef.current = true
+          prevDsnRef.current = state.currentDsn
         }
       } catch (e) {
         console.error('Render error:', e)
       }
     } else if (!state.boardData) {
       hasFittedRef.current = false
+      prevDsnRef.current = null
     }
-  }, [state.boardData, state.layerVisibility])
+  }, [state.boardData, state.layerVisibility, state.currentDsn])
 
   return <div ref={containerRef} style={s.canvas} tabIndex={0} />
 }

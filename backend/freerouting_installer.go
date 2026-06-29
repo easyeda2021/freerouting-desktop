@@ -131,6 +131,7 @@ func saveConfig(cfg Config) error {
 		log.Printf("Failed to rename config temp file: %v", err)
 		return err
 	}
+	log.Printf("Config saved to %s: %+v", getConfigPath(), cfg)
 	return nil
 }
 
@@ -154,13 +155,18 @@ func saveFreeRoutingPath(path string) {
 }
 
 func getLastDir() string {
-	return loadConfig().LastDir
+	dir := loadConfig().LastDir
+	log.Printf("getLastDir returned: %q", dir)
+	return dir
 }
 
 func saveLastDir(dir string) {
+	log.Printf("saveLastDir called with: %q", dir)
 	cfg := loadConfig()
 	cfg.LastDir = dir
-	saveConfig(cfg)
+	if err := saveConfig(cfg); err != nil {
+		log.Printf("saveLastDir failed: %v", err)
+	}
 }
 
 func getFreeRoutingVersionFromAPI() string {

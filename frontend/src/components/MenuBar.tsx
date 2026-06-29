@@ -123,21 +123,29 @@ export default function MenuBar() {
   }
 
   const handleOpenDsn = async () => {
+    let path: string
     try {
-      const path = await window.openFileDialog()
-      if (path) {
-        const content = window.readFile(path)
-        if (content) {
-          const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
-          await loadDsnFromContent(content, fileName)
-          return
-        }
-      }
-      // Fallback to HTML file input if native dialog is blocked or cancelled
-      fileInputRef.current?.click()
+      path = await window.openFileDialog()
     } catch (err) {
       console.error('Native file dialog failed, falling back to HTML input:', err)
       fileInputRef.current?.click()
+      return
+    }
+    if (!path) {
+      // User cancelled native dialog; use HTML fallback
+      fileInputRef.current?.click()
+      return
+    }
+    const content = window.readFile(path)
+    if (!content) {
+      log('Error', `Failed to read file: ${path}`)
+      return
+    }
+    try {
+      const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
+      await loadDsnFromContent(content, fileName)
+    } catch (err) {
+      log('Error', `Failed to load DSN: ${err}`)
     }
   }
 
