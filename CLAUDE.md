@@ -9,9 +9,11 @@ FreeRouting Desktop — Go + WebView PCB auto-router GUI.
 cd frontend && npm run dev          # → localhost:1420
 
 # Go host (dev mode, loads frontend from Vite dev server)
-export CC=/c/msys64/mingw64/bin/gcc && cd backend && go run .
+# MinGW-w64 must be on PATH; webview_go requires CGO on Windows.
+export PATH="/c/msys64/mingw64/bin:$PATH" && export CC=gcc && cd backend && go run .
 
-# Production build
+# Production build (requires make, go-winres, MinGW-w64 on PATH)
+export PATH="/c/msys64/mingw64/bin:$PATH"
 make windows
 ```
 

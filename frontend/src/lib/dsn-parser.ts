@@ -1,4 +1,4 @@
-import type { BoardData, ViaData } from './board-types'
+import type { BoardData, ViaData, PinData, ShapeData } from './board-types'
 
 type Token =
   | { type: 'open' }
@@ -36,8 +36,11 @@ class DsnTokenizer {
     if (ch === ')') { this.pos++; return { type: 'close' } }
     if (ch === '"' || ch === "'") {
       if (hasMatchingQuote(this.input, this.pos)) return this.readString(ch)
+      // No matching close quote — consume as bareword (e.g. KiCad's (string_quote "))
+      this.pos++
+      return { type: 'string', value: ch }
     }
-    if (/[+-]?\d/.test(ch)) return this.readNumber()
+    if (ch === '-' || ch === '+' || /\d/.test(ch)) return this.readNumber()
     return this.readBareword()
   }
 
@@ -161,6 +164,7 @@ export function parseDsn(content: string): BoardData {
     vias: [],
     components: [],
     padstacks: [],
+    images: [],
   }
 
   const layerSet = new Set<string>()
@@ -219,9 +223,9 @@ export function parseDsn(content: string): BoardData {
     if (boundary) {
       for (const bItem of boundary) {
         if (Array.isArray(bItem) && bItem.length >= 2 && (bItem[0] === 'path' || bItem[0] === 'wire')) {
-          // Collect all coordinate pairs from index 2
+          // Collect all coordinate pairs from index 3 (skip layer name and width)
           const rawCoords: [number, number][] = []
-          for (let i = 2; i < bItem.length - 1; i += 2) {
+          for (let i = 3; i < bItem.length - 1; i += 2) {
             rawCoords.push([Number(bItem[i]), Number(bItem[i + 1])])
           }
           if (rawCoords.length < 2) continue
@@ -311,6 +315,57 @@ export function parseDsn(content: string): BoardData {
     }
   }
 
+  // Parse library section (images/padstacks)
+  const library = findList(sections, 'library')
+  if (library) {
+    for (const item of library) {
+      if (!Array.isArray(item)) continue
+      if (item[0] === 'image') {
+        const imageName = String(item[1])
+        const pins: PinData[] = []
+        for (const sub of item.slice(2)) {
+          if (!Array.isArray(sub) || sub[0] !== 'pin') continue
+          let rotation = 0
+          let pinNumberIdx = 2
+          if (Array.isArray(sub[2]) && (sub[2] as SExpr[])[0] === 'rotate') {
+            rotation = Number((sub[2] as SExpr[])[1])
+            pinNumberIdx = 3
+          }
+          pins.push({
+            padstackName: String(sub[1]),
+            pinNumber: String(sub[pinNumberIdx]),
+            x: Number(sub[pinNumberIdx + 1]),
+            y: Number(sub[pinNumberIdx + 2]),
+            rotation,
+          })
+        }
+        boardData.images.push({ name: imageName, pins })
+      } else if (item[0] === 'padstack') {
+        const padstackName = String(item[1])
+        const shapes: ShapeData[] = []
+        for (const sub of item.slice(2)) {
+          if (!Array.isArray(sub) || sub[0] !== 'shape') continue
+          const shapeDef = sub[1]
+          if (!Array.isArray(shapeDef)) continue
+          const shapeType = String(shapeDef[0])
+          const layer = String(shapeDef[1])
+          layerSet.add(layer)
+          if (shapeType === 'circle') {
+            shapes.push({ layer, shapeType, params: [Number(shapeDef[2])] })
+          } else if (shapeType === 'rect') {
+            shapes.push({ layer, shapeType, params: [Number(shapeDef[2]), Number(shapeDef[3]), Number(shapeDef[4]), Number(shapeDef[5])] })
+          } else if (shapeType === 'path') {
+            const width = Number(shapeDef[2])
+            const coords: number[] = []
+            for (let i = 3; i < shapeDef.length; i++) coords.push(Number(shapeDef[i]))
+            shapes.push({ layer, shapeType, params: [width, ...coords] })
+          }
+        }
+        boardData.padstacks.push({ name: padstackName, shapes })
+      }
+    }
+  }
+
   boardData.layers = Array.from(layerSet).map((name, index) => ({ name, index }))
 
   return boardData
@@ -321,5 +376,5 @@ export function parseDsn(content: string): BoardData {
 }
 
 function emptyBoard(): BoardData {
-  return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [] }
+  return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [], images: [] }
 }

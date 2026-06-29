@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type ChangeEvent } from 'react'
 import { useApp } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
@@ -12,6 +12,8 @@ declare global {
     startFreeRouting: () => string
     stopFreeRouting: () => void
     openURL: (url: string) => void
+    openFileDialog: () => string
+    readFile: (path: string) => string
   }
 }
 
@@ -19,57 +21,89 @@ export default function MenuBar() {
   const { state, dispatch } = useApp()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleOpenDsn = () => {
-    fileInputRef.current?.click()
+  const loadDsnFromContent = async (content: string, fileName: string) => {
+    try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
+
+    dispatch({ type: 'RESET' })
+
+    const initialBoard = parseDsn(content)
+    dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
+
+    const session = await createSession()
+    dispatch({ type: 'SET_SESSION', sessionId: session.id })
+
+    const job = await createJob(session.id)
+    dispatch({ type: 'SET_JOB', jobId: job.id })
+
+    await uploadDsn(job.id, fileName, content)
+    await startRouting(job.id)
+
+    streamLogs(job.id, (log) => {
+      dispatch({ type: 'ADD_LOG', entry: log as LogEntry })
+      const match = log.message.match(/score of ([\d.]+)/i)
+      if (match) dispatch({ type: 'SET_SCORE', score: parseFloat(match[1]) })
+    })
+
+    let sesBuffer = ''
+    streamOutput(job.id, (data) => {
+      try {
+        // The stream may send either raw base64 or a JSON wrapper {"data":"base64..."}
+        let base64 = data
+        if (data.trimStart().startsWith('{')) {
+          const parsed = JSON.parse(data)
+          base64 = parsed.data || parsed.output || parsed.ses || ''
+        }
+        if (!base64) return
+        // Accumulate base64 chunks; try parsing after each chunk
+        sesBuffer += base64
+        const sesContent = atob(sesBuffer)
+        const boardData = parseSes(sesContent)
+        dispatch({ type: 'SET_BOARD_DATA', data: boardData })
+        sesBuffer = ''
+      } catch {
+        // Keep buffer for next chunk if this one is partial
+        if (sesBuffer.length > 5_000_000) sesBuffer = ''
+      }
+    })
+
+    const poll = setInterval(async () => {
+      try {
+        const status = await getJobStatus(job.id)
+        dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
+        if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
+      } catch { /* ignore */ }
+    }, 2000)
   }
 
-  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
+  const handleOpenDsn = async () => {
+    try {
+      const path = await window.openFileDialog()
+      if (path) {
+        const content = window.readFile(path)
+        if (content) {
+          const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
+          await loadDsnFromContent(content, fileName)
+          return
+        }
+      }
+      // Fallback to HTML file input if native dialog is blocked or cancelled
+      fileInputRef.current?.click()
+    } catch (err) {
+      console.error('Native file dialog failed, falling back to HTML input:', err)
+      fileInputRef.current?.click()
+    }
+  }
 
+  const handleFileInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
     try {
       const content = await file.text()
       if (!content) return
-      // Save filename hint in localStorage
-      try { localStorage.setItem('last_dsn_file', file.name) } catch { /* ignore */ }
-
-      dispatch({ type: 'RESET' })
-
-      const initialBoard = parseDsn(content)
-      dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
-
-      const session = await createSession()
-      dispatch({ type: 'SET_SESSION', sessionId: session.id })
-
-      const job = await createJob(session.id)
-      dispatch({ type: 'SET_JOB', jobId: job.id })
-
-      await uploadDsn(job.id, file.name, content)
-      await startRouting(job.id)
-
-      streamLogs(job.id, (log) => {
-        dispatch({ type: 'ADD_LOG', entry: log as LogEntry })
-        const match = log.message.match(/score of ([\d.]+)/i)
-        if (match) dispatch({ type: 'SET_SCORE', score: parseFloat(match[1]) })
-      })
-
-      streamOutput(job.id, (base64Data) => {
-        try {
-          const sesContent = atob(base64Data)
-          const boardData = parseSes(sesContent)
-          dispatch({ type: 'SET_BOARD_DATA', data: boardData })
-        } catch { /* partial data */ }
-      })
-
-      const poll = setInterval(async () => {
-        try {
-          const status = await getJobStatus(job.id)
-          dispatch({ type: 'SET_JOB_STATE', state: status.state, stage: status.stage || '', currentPass: status.current_pass || 0 })
-          if (status.state === 'COMPLETED' || status.state === 'CANCELLED') clearInterval(poll)
-        } catch { /* ignore */ }
-      }, 2000)
+      await loadDsnFromContent(content, file.name)
     } catch (err) {
+      console.error('Failed to read selected file:', err)
       dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
     }
   }
@@ -95,22 +129,30 @@ export default function MenuBar() {
   }
 
   return (
-    <div style={s.bar}>
-      <div style={s.left}>
-        <input ref={fileInputRef} type="file" accept=".dsn" style={{ display: 'none' }} onChange={onFileSelected} />
-        <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
-          Open DSN
-        </button>
-        <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
-          Export SES
-        </button>
+    <>
+      <input
+        type="file"
+        accept=".dsn,.ses"
+        ref={fileInputRef}
+        onChange={handleFileInputChange}
+        style={{ display: 'none' }}
+      />
+      <div style={s.bar}>
+        <div style={s.left}>
+          <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
+            Open DSN
+          </button>
+          <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
+            Export SES
+          </button>
+        </div>
+        {state.frStatus === 'ready' ? (
+          <span style={s.connected}>FreeRouting Connected</span>
+        ) : (
+          <span style={s.version}>{state.frStatus}</span>
+        )}
       </div>
-      {state.frStatus === 'ready' ? (
-        <span style={s.connected}>FreeRouting Connected</span>
-      ) : (
-        <span style={s.version}>{state.frStatus}</span>
-      )}
-    </div>
+    </>
   )
 }
 

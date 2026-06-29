@@ -27,8 +27,21 @@ export interface ComponentData {
 
 export interface ShapeData {
   layer: string
-  shapeType: 'circle' | 'rect' | 'polygon'
+  shapeType: 'circle' | 'rect' | 'polygon' | 'path'
   params: number[]
+}
+
+export interface PinData {
+  padstackName: string
+  pinNumber: string
+  x: number
+  y: number
+  rotation: number
+}
+
+export interface ImageData {
+  name: string
+  pins: PinData[]
 }
 
 export interface PadstackData {
@@ -44,6 +57,7 @@ export interface BoardData {
   vias: ViaData[]
   components: ComponentData[]
   padstacks: PadstackData[]
+  images: ImageData[]
 }
 
 export interface LogEntry {

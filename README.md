@@ -34,7 +34,9 @@ FreeRouting packages bundle their own JRE — users never need to install Java.
 
 - [Go](https://go.dev/dl/) 1.21+
 - [Node.js](https://nodejs.org/) 18+
+- [Make](https://www.gnu.org/software/make/)
 - C compiler (MinGW-w64 on Windows, Xcode CLI on macOS, GCC on Linux)
+- [go-winres](https://github.com/tc-hib/go-winres) (`go install github.com/tc-hib/go-winres@latest`) — required for Windows icon/version resources
 
 ### Setup
 
@@ -53,17 +55,40 @@ cd backend && go run .   # opens WebView loading localhost:1420
 
 ### Build
 
+The project uses a Makefile to build the frontend, embed it into the Go binary, generate Windows resources (icon/version info), and compile the final executable.
+
 ```bash
-cd frontend && npm run build    # → ../dist/
+# Windows (requires MinGW-w64 in PATH)
+make windows
 
-# Build Go binary
-go build -ldflags="-s -w" -o freerouting-desktop .
+# macOS
+make macos
 
-# Cross-compile
-GOOS=windows go build -ldflags="-s -w" -o freerouting-desktop.exe .
-GOOS=darwin  go build -ldflags="-s -w" -o freerouting-desktop-mac .
-GOOS=linux   go build -ldflags="-s -w" -o freerouting-desktop-linux .
+# Linux
+make linux
 ```
+
+The Windows executable is written to `build/freerouting-desktop-<version>-windows-x64.exe`.
+
+**Note on Windows toolchains:** `webview_go` requires CGO. Make sure MinGW-w64 is installed and its `bin` directory is on your PATH, then build with the compiler discoverable as `gcc`:
+
+```powershell
+# Example with MSYS2 MinGW-w64
+$env:PATH = "C:\msys64\mingw64\bin;" + $env:PATH
+make windows
+```
+
+#### Simplified / no-icon build
+
+If you only need a runnable binary without icons or Windows version metadata, you can build directly after `cd frontend && npm run build`:
+
+```bash
+cd backend
+# On Windows with MinGW in PATH
+go build -ldflags="-s -w -H windowsgui" -o freerouting-desktop.exe .
+```
+
+Cross-compilation is limited because `webview_go` depends on CGO and platform-specific WebView libraries; building for Windows must be done on Windows (or with a matching MinGW toolchain).
 
 ## How It Works
 

@@ -101,8 +101,13 @@ async function streamSSE(url: string, onData: (data: string) => void) {
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          onData(line.slice(6))
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        if (trimmed.startsWith('data: ')) {
+          onData(trimmed.slice(6))
+        } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          // Some endpoints emit raw JSON lines instead of SSE data: lines
+          onData(trimmed)
         }
       }
     }

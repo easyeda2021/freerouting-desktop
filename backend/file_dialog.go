@@ -79,7 +79,7 @@ $form.Dispose()
 `, filter, title, dirScript)
 	// DO NOT hide window for file dialogs — PowerShell needs a visible window
 	// to show Windows.Forms dialogs properly
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).Output()
+	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +101,7 @@ if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 $form.Dispose()
 `, defaultName)
 	// DO NOT hide window for file dialogs
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).Output()
+	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
 	if err != nil {
 		return "", err
 	}
