@@ -8,7 +8,20 @@ Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host dete
 
 ## Download
 
-You can download the file at [Release](https://github.com/easyeda2021/freerouting-desktop/releases) 
+You can download the file at [Release](https://github.com/easyeda2021/freerouting-desktop/releases)
+
+## Features
+
+- **LeaferJS PCB canvas** — visualize DSN and live SES routing output with layer visibility, ratsnest (airwire) display, zoom/pan, and object selection.
+- **Native Windows file dialogs** — open/save dialogs powered by COMDLG32 (macOS and Linux use native dialogs via AppleScript / Zenity / KDialog).
+- **Canvas measurement tool** — measure distances on the board with readout in mm or mil.
+- **Unit & language switching** — toggle between mm/mil and English/中文 from the toolbar.
+- **Layer list** — per-layer visibility toggles with eye icons and customizable colors.
+- **Drag-and-drop DSN opening** — drop a `.dsn` file onto the canvas to load it.
+- **Empty-state prompt** — canvas shows an open-file prompt when no board is loaded.
+- **About dialog** — version, description, feature list, repository link, and author.
+- **Recent files** — recently opened DSN files persisted in `localStorage`.
+- **Clean Windows startup** — hidden parent window eliminates the startup flash; per-monitor DPI awareness keeps rendering sharp on high-DPI displays.
 
 ## Architecture
 

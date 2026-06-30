@@ -59,9 +59,9 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   function resize() {
-    // Leafer's App auto-resizes with its view; manual resize() calls were
-    // triggering internal 'width' errors, so we now only re-fit when asked.
-    fitView()
+    // Leafer's App auto-resizes with its view. We no longer auto-fit on
+    // container/window resize because that resets the user's zoom/pan when
+    // side panels or status text update.
   }
 
   function fitView() {
@@ -458,7 +458,7 @@ export function createPcbRenderer(container: HTMLElement) {
 
     const label = formatLength(dist)
     const labelText = `${label.mm} / ${label.mil}`
-    const fontSize = 10 / scale
+    const fontSize = 12 / scale
     const text = new Text({
       text: labelText,
       x: midX + ox,

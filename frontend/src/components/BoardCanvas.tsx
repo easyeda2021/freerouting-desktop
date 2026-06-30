@@ -10,7 +10,6 @@ export default function BoardCanvas() {
   const crosshairRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
-  const hasFittedRef = useRef(false)
   const prevDsnRef = useRef<string | null>(null)
   const measurementRef = useRef(state.measurement)
   const measurePhaseRef = useRef<'idle' | 'started'>('idle')
@@ -241,44 +240,45 @@ export default function BoardCanvas() {
     }
   }, [handleOpenDroppedFile])
 
+  // Render the board whenever the data or display options change.
   useEffect(() => {
-    if (state.boardData && rendererRef.current) {
-      const isNewDsn = prevDsnRef.current !== state.currentDsn
-      const hiddenNets = new Set(state.nets.filter((n) => !n.visible).map((n) => n.name))
-      try {
-        rendererRef.current.render(state.boardData, state.layerVisibility, {
-          hiddenNets,
-          selectedNet: state.selectedNet,
-          selectedObject: state.selectedObject,
-          layerColors: state.layerColors,
-          onSelectTrace: (trace) => {
-            dispatch({ type: 'SELECT_OBJECT', object: { type: 'trace', id: trace.netName || '', netName: trace.netName, layer: trace.layer } })
-            dispatch({ type: 'SELECT_NET', netName: trace.netName || null })
-          },
-          onSelectVia: (via) => {
-            dispatch({ type: 'SELECT_OBJECT', object: { type: 'via', id: via.netName || '', netName: via.netName } })
-            dispatch({ type: 'SELECT_NET', netName: via.netName || null })
-          },
-          onSelectComponent: (comp) => dispatch({ type: 'SELECT_OBJECT', object: { type: 'component', id: comp.refdes, refdes: comp.refdes } }),
-          onSelectPad: (pad) => dispatch({ type: 'SELECT_OBJECT', object: pad }),
-          onEmptyClick: () => {
-            dispatch({ type: 'SELECT_OBJECT', object: null })
-            dispatch({ type: 'SELECT_NET', netName: null })
-          },
-        })
-        if (isNewDsn || !hasFittedRef.current) {
-          rendererRef.current?.fitView()
-          hasFittedRef.current = true
-          prevDsnRef.current = state.currentDsn
-        }
-      } catch (e) {
-        console.error('Render error:', e)
-      }
-    } else if (!state.boardData) {
-      hasFittedRef.current = false
+    if (!state.boardData || !rendererRef.current) return
+    const hiddenNets = new Set(state.nets.filter((n) => !n.visible).map((n) => n.name))
+    try {
+      rendererRef.current.render(state.boardData, state.layerVisibility, {
+        hiddenNets,
+        selectedNet: state.selectedNet,
+        selectedObject: state.selectedObject,
+        layerColors: state.layerColors,
+        onSelectTrace: (trace) => {
+          dispatch({ type: 'SELECT_OBJECT', object: { type: 'trace', id: trace.netName || '', netName: trace.netName, layer: trace.layer } })
+          dispatch({ type: 'SELECT_NET', netName: trace.netName || null })
+        },
+        onSelectVia: (via) => {
+          dispatch({ type: 'SELECT_OBJECT', object: { type: 'via', id: via.netName || '', netName: via.netName } })
+          dispatch({ type: 'SELECT_NET', netName: via.netName || null })
+        },
+        onSelectComponent: (comp) => dispatch({ type: 'SELECT_OBJECT', object: { type: 'component', id: comp.refdes, refdes: comp.refdes } }),
+        onSelectPad: (pad) => dispatch({ type: 'SELECT_OBJECT', object: pad }),
+        onEmptyClick: () => {
+          dispatch({ type: 'SELECT_OBJECT', object: null })
+          dispatch({ type: 'SELECT_NET', netName: null })
+        },
+      })
+    } catch (e) {
+      console.error('Render error:', e)
+    }
+  }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.selectedObject, dispatch])
+
+  // Fit the view only when a new DSN is loaded.
+  useEffect(() => {
+    if (state.currentDsn && rendererRef.current && prevDsnRef.current !== state.currentDsn) {
+      rendererRef.current.fitView()
+      prevDsnRef.current = state.currentDsn
+    } else if (!state.currentDsn) {
       prevDsnRef.current = null
     }
-  }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.selectedObject, state.currentDsn, dispatch])
+  }, [state.currentDsn])
 
   useEffect(() => {
     const m = state.measurement

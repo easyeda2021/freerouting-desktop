@@ -4,7 +4,6 @@ package main
 
 import (
 	"log"
-	"runtime"
 	"strings"
 	"syscall"
 	"unicode/utf16"
@@ -86,25 +85,11 @@ func parseFilterWindows(filter string) (*uint16, error) {
 }
 
 func showFileDialogWindows(filter, title string, save bool, defaultName string) (string, error) {
-	// Run the dialog on a dedicated thread with STA apartment. The main Go
-	// thread may already be in MTA, which causes GetOpenFileNameW to fail.
-	result := make(chan string, 1)
-	go func() {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-
-		coRet, _, _ := procCoInitializeEx.Call(0, uintptr(coInitApartmentThreaded))
-		log.Printf("[dialog] CoInitializeEx result=0x%x", coRet)
-		defer procCoUninitialize.Call()
-
-		path, err := runFileDialogOnSTA(filter, title, save, defaultName)
-		if err != nil {
-			log.Printf("[dialog] runFileDialogOnSTA error: %v", err)
-		}
-		log.Printf("[dialog] runFileDialogOnSTA returned path=%q", path)
-		result <- path
-	}()
-	return <-result, nil
+	// The app now ensures the main GUI thread is in STA before creating the
+	// WebView. Running the modal file dialog on that same thread lets Windows
+	// manage the dialog's message loop without deadlocking against the owner
+	// window, which was happening when the dialog ran on a background goroutine.
+	return runFileDialogOnSTA(filter, title, save, defaultName)
 }
 
 func runFileDialogOnSTA(filter, title string, save bool, defaultName string) (string, error) {

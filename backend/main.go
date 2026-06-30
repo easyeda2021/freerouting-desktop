@@ -24,6 +24,10 @@ var (
 	platform = "dev"
 )
 
+// wv is the active WebView instance; it is referenced by the Win32 WndProc to
+// terminate the message loop when the parent window is destroyed.
+var wv webview.WebView
+
 func main() {
 	logPath := filepath.Join(getFreeRoutingDir(), "app.log")
 	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
@@ -74,14 +78,17 @@ func main() {
 	time.Sleep(200 * time.Millisecond)
 	log.Println("Step 2: HTTP server started")
 
-	// Step 3: create WebView
+	// Step 3: create WebView inside a hidden parent window so the initial
+	// default-size flash is avoided.
 	log.Println("Step 3: creating WebView...")
-	w := webview.New(true)
+	winW, winH := initialWindowSize()
+	hostWnd := createHostWindow(winW, winH)
+	w := webview.NewWindow(true, hostWnd)
+	wv = w
 	log.Println("Step 3: WebView created OK")
 	defer w.Destroy()
 
 	w.SetTitle("FreeRouting Desktop " + version)
-	winW, winH := initialWindowSize()
 	w.SetSize(winW, winH, webview.HintNone)
 	prepareWindow(w.Window(), winW, winH)
 
