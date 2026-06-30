@@ -12,7 +12,12 @@ var (
 	comdlg32             = syscall.NewLazyDLL("comdlg32.dll")
 	procGetOpenFileNameW = comdlg32.NewProc("GetOpenFileNameW")
 	procGetSaveFileNameW = comdlg32.NewProc("GetSaveFileNameW")
+	ole32                = syscall.NewLazyDLL("ole32.dll")
+	procCoInitializeEx   = ole32.NewProc("CoInitializeEx")
+	procCoUninitialize   = ole32.NewProc("CoUninitialize")
 )
+
+const coInitApartmentThreaded = 0x2
 
 type openFileName struct {
 	lStructSize       uint32
@@ -77,6 +82,10 @@ func parseFilterWindows(filter string) (*uint16, error) {
 }
 
 func showFileDialogWindows(filter, title string, save bool, defaultName string) (string, error) {
+	// Common dialogs require STA on the calling thread
+	procCoInitializeEx.Call(0, uintptr(coInitApartmentThreaded))
+	defer procCoUninitialize.Call()
+
 	filterPtr, err := parseFilterWindows(filter)
 	if err != nil {
 		return "", err

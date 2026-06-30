@@ -59,24 +59,9 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   function resize() {
-    const rect = container.getBoundingClientRect()
-    if (!rect.width || !rect.height) return
-    try {
-      ;(app as any).resize?.()
-    } catch (e) {
-      console.error('PCB resize error:', e)
-    }
-    // Wait a frame so the canvas/view bounds reflect the new container size
-    requestAnimationFrame(() => {
-      const rect2 = container.getBoundingClientRect()
-      if (!rect2.width || !rect2.height) return
-      try {
-        ;(app as any).resize?.()
-      } catch (e) {
-        console.error('PCB resize error:', e)
-      }
-      fitView()
-    })
+    // Leafer's App auto-resizes with its view; manual resize() calls were
+    // triggering internal 'width' errors, so we now only re-fit when asked.
+    fitView()
   }
 
   function fitView() {
