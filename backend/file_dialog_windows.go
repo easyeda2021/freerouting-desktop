@@ -3,6 +3,7 @@
 package main
 
 import (
+	"log"
 	"runtime"
 	"strings"
 	"syscall"
@@ -10,12 +11,13 @@ import (
 )
 
 var (
-	comdlg32             = syscall.NewLazyDLL("comdlg32.dll")
-	procGetOpenFileNameW = comdlg32.NewProc("GetOpenFileNameW")
-	procGetSaveFileNameW = comdlg32.NewProc("GetSaveFileNameW")
-	ole32                = syscall.NewLazyDLL("ole32.dll")
-	procCoInitializeEx   = ole32.NewProc("CoInitializeEx")
-	procCoUninitialize   = ole32.NewProc("CoUninitialize")
+	comdlg32               = syscall.NewLazyDLL("comdlg32.dll")
+	procGetOpenFileNameW   = comdlg32.NewProc("GetOpenFileNameW")
+	procGetSaveFileNameW   = comdlg32.NewProc("GetSaveFileNameW")
+	procCommDlgExtendedErr = comdlg32.NewProc("CommDlgExtendedError")
+	ole32                  = syscall.NewLazyDLL("ole32.dll")
+	procCoInitializeEx     = ole32.NewProc("CoInitializeEx")
+	procCoUninitialize     = ole32.NewProc("CoUninitialize")
 )
 
 const coInitApartmentThreaded = 0x2
@@ -90,7 +92,8 @@ func showFileDialogWindows(filter, title string, save bool, defaultName string) 
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 
-		procCoInitializeEx.Call(0, uintptr(coInitApartmentThreaded))
+		coRet, _, _ := procCoInitializeEx.Call(0, uintptr(coInitApartmentThreaded))
+		log.Printf("[dialog] CoInitializeEx result=0x%x", coRet)
 		defer procCoUninitialize.Call()
 
 		path, _ := runFileDialogOnSTA(filter, title, save, defaultName)
@@ -135,6 +138,7 @@ func runFileDialogOnSTA(filter, title string, save bool, defaultName string) (st
 	if save {
 		ofn.Flags = ofnPathMustExist | ofnOverwritePrompt | ofnNoReadOnlyReturn | ofnHideReadOnly
 	}
+	log.Printf("[dialog] struct size=%d save=%v", ofn.lStructSize, save)
 
 	var ret uintptr
 	if save {
@@ -143,7 +147,11 @@ func runFileDialogOnSTA(filter, title string, save bool, defaultName string) (st
 		ret, _, _ = procGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
 	}
 	if ret == 0 {
+		errCode, _, _ := procCommDlgExtendedErr.Call()
+		log.Printf("[dialog] GetOpenFileNameW returned 0, CommDlgExtendedError=%d", errCode)
 		return "", nil
 	}
-	return syscall.UTF16ToString(fileBuf), nil
+	selected := syscall.UTF16ToString(fileBuf)
+	log.Printf("[dialog] selected path=%q", selected)
+	return selected, nil
 }
