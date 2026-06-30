@@ -127,3 +127,4 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.version }}
           files: artifacts/*
+          generate_release_notes: true
