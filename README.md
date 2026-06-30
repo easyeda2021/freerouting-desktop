@@ -6,11 +6,11 @@ Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host dete
 
 Start:
 
-
+![FreeRouting Desktop](images/pixpin_20260630_205517.jpg)
 
 Routing:
 
-![alt text](images/pixpin_20260630_204026.jpg)
+![FreeRouting Desktop](images/pixpin_20260630_204026.jpg)
 
 Measure: 
 
