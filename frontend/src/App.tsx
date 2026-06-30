@@ -48,7 +48,7 @@ interface AppState {
   language: Lang
 }
 
-type Action =
+export type Action =
   | { type: 'SET_FR_STATUS'; payload: FRStatusData }
   | { type: 'SET_SESSION'; sessionId: string }
   | { type: 'SET_JOB'; jobId: string }

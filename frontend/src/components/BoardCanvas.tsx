@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useApp } from '../App'
 import { createPcbRenderer } from '../lib/pcb-renderer'
+import { loadDsnFromContent } from '../lib/dsn-loader'
 
 export default function BoardCanvas() {
   const { state, dispatch } = useApp()
@@ -13,6 +14,43 @@ export default function BoardCanvas() {
   const prevDsnRef = useRef<string | null>(null)
   const measurementRef = useRef(state.measurement)
   const measurePhaseRef = useRef<'idle' | 'started'>('idle')
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleOpenDroppedFile = useCallback(async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.dsn')) {
+      dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Warn', message: `Only .dsn files are supported for drag-and-drop (got ${file.name})`, topic: 'App' } })
+      return
+    }
+    try {
+      const content = await file.text()
+      if (!content) return
+      await loadDsnFromContent(dispatch, content, file.name, undefined)
+    } catch (err) {
+      dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: `Failed to load DSN: ${err}`, topic: 'App' } })
+    }
+  }, [dispatch])
+
+  const handleOpenByDialog = useCallback(async () => {
+    let path: string
+    try {
+      path = await window.openFileDialog()
+    } catch (err) {
+      console.error('Native file dialog failed:', err)
+      return
+    }
+    if (!path) return
+    const content = await window.readFile(path)
+    if (!content) {
+      dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: `Failed to read file: ${path}`, topic: 'App' } })
+      return
+    }
+    try {
+      const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
+      await loadDsnFromContent(dispatch, content, fileName, path)
+    } catch (err) {
+      dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: `Failed to load DSN: ${err}`, topic: 'App' } })
+    }
+  }, [dispatch])
 
   useEffect(() => {
     measurementRef.current = state.measurement
@@ -126,6 +164,27 @@ export default function BoardCanvas() {
       e.preventDefault()
     }
 
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      setDragOver(true)
+    }
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOver(false)
+    }
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDragOver(false)
+      const file = e.dataTransfer?.files?.[0]
+      if (file) handleOpenDroppedFile(file)
+    }
+
     window.addEventListener('resize', handleResize)
     document.addEventListener('fullscreenchange', handleResize)
     resizeObserver.observe(container)
@@ -135,6 +194,9 @@ export default function BoardCanvas() {
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
     container.addEventListener('contextmenu', handleContextMenu)
+    container.addEventListener('dragover', handleDragOver)
+    container.addEventListener('dragleave', handleDragLeave)
+    container.addEventListener('drop', handleDrop)
 
     return () => {
       window.removeEventListener('resize', handleResize)
@@ -146,9 +208,12 @@ export default function BoardCanvas() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
       container.removeEventListener('contextmenu', handleContextMenu)
+      container.removeEventListener('dragover', handleDragOver)
+      container.removeEventListener('dragleave', handleDragLeave)
+      container.removeEventListener('drop', handleDrop)
       rendererRef.current?.destroy()
     }
-  }, [])
+  }, [handleOpenDroppedFile])
 
   useEffect(() => {
     if (state.boardData && rendererRef.current) {
@@ -217,8 +282,19 @@ export default function BoardCanvas() {
     rendererRef.current?.fitView()
   }, [state.fitViewTrigger])
 
+  const showEmptyState = !state.boardData
+
   return (
     <div ref={containerRef} style={s.canvas} tabIndex={0}>
+      {showEmptyState && (
+        <div style={{ ...s.emptyOverlay, ...(dragOver ? s.emptyOverlayActive : {}) }}>
+          <div style={s.emptyBox}>
+            <div style={s.emptyTitle}>FreeRouting Desktop</div>
+            <button style={s.emptyBtn} onClick={handleOpenByDialog}>打开文件</button>
+            <div style={s.emptyHint}>请打开 DSN 文件或拖动 DSN 文件在此处打开</div>
+          </div>
+        </div>
+      )}
       <div ref={crosshairRef} style={s.crosshair}>
         <div style={s.crosshairH} />
         <div style={s.crosshairV} />
@@ -253,4 +329,10 @@ const s: Record<string, React.CSSProperties> = {
     width: 1,
     background: '#ffffff',
   } as React.CSSProperties,
+  emptyOverlay: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, transition: 'background 0.15s' },
+  emptyOverlayActive: { background: 'rgba(233, 69, 96, 0.08)' },
+  emptyBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, width: 360, height: 240, border: '2px dashed #4a5568', borderRadius: 16, background: 'rgba(15, 52, 96, 0.3)', padding: 32 },
+  emptyTitle: { color: '#e0e0e0', fontSize: 22, fontWeight: 600, letterSpacing: 1 },
+  emptyBtn: { padding: '10px 28px', border: '1px solid #4a5568', borderRadius: 6, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 14, fontWeight: 500 },
+  emptyHint: { color: '#888', fontSize: 12, textAlign: 'center', lineHeight: 1.5 },
 }

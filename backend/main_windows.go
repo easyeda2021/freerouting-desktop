@@ -15,6 +15,22 @@ var (
 	procSetWindowPos     = user32.NewProc("SetWindowPos")
 	procMoveWindow       = user32.NewProc("MoveWindow")
 	procGetWindowRect    = user32.NewProc("GetWindowRect")
+	procSendMessageW     = user32.NewProc("SendMessageW")
+	procLoadImageW       = user32.NewProc("LoadImageW")
+	kernel32             = syscall.NewLazyDLL("kernel32.dll")
+	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
+)
+
+const (
+	wmSetIcon = 0x0080
+	iconSmall = 0
+	iconBig   = 1
+)
+
+const (
+	imageIcon    = 1
+	lrDefaultSize = 0x0040
+	lrShared      = 0x8000
 )
 
 func screenSize() (int, int) {
@@ -57,4 +73,25 @@ func setWindowCenter(hwnd uintptr, width, height int) {
 		y = 0
 	}
 	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
+	setWindowIcon(hwnd)
+}
+
+func setWindowIcon(hwnd uintptr) {
+	// Load the first icon group (ID 1) from the executable and apply it to
+	// both the small and big title-bar icons.
+	hInstance, _, _ := procGetModuleHandleW.Call(0)
+	iconName, _ := syscall.UTF16PtrFromString("#1")
+	hIcon, _, _ := procLoadImageW.Call(
+		hInstance,
+		uintptr(unsafe.Pointer(iconName)),
+		uintptr(imageIcon),
+		0,
+		0,
+		uintptr(lrDefaultSize|lrShared),
+	)
+	if hIcon == 0 {
+		return
+	}
+	procSendMessageW.Call(hwnd, uintptr(wmSetIcon), uintptr(iconSmall), hIcon)
+	procSendMessageW.Call(hwnd, uintptr(wmSetIcon), uintptr(iconBig), hIcon)
 }

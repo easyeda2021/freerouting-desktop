@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, type ChangeEvent } from 'react'
 import { useApp, RECENT_FILES_KEY, ROUTING_SETTINGS_KEY } from '../App'
-import { createSession, createJob, uploadDsn, startRouting, cancelRouting, setJobSettings, getDrcResults, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
+import { createJob, uploadDsn, startRouting, cancelRouting, setJobSettings, getDrcResults, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
+import { loadDsnFromContent } from '../lib/dsn-loader'
 import type { BoardData, LogEntry, DrcViolation } from '../lib/board-types'
 import { t } from '../lib/i18n'
 
@@ -86,6 +87,17 @@ export default function MenuBar() {
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [recentOpen])
+
+  // Reset stream/job refs whenever a new DSN is loaded (from any source)
+  useEffect(() => {
+    outputFetchedRef.current = false
+    pendingMergeRef.current = null
+    jobStartedRef.current = false
+    if (mergeTimerRef.current) {
+      clearTimeout(mergeTimerRef.current)
+      mergeTimerRef.current = null
+    }
+  }, [state.currentDsn])
 
   const log = (type: 'Info' | 'Warn' | 'Error', message: string, topic = 'App') => {
     dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type, message, topic } })
@@ -184,53 +196,6 @@ export default function MenuBar() {
     }, 5000)
   }
 
-  const loadDsnFromContent = async (content: string, fileName: string, fullPath?: string) => {
-    outputFetchedRef.current = false
-    pendingMergeRef.current = null
-    jobStartedRef.current = false
-    if (mergeTimerRef.current) {
-      clearTimeout(mergeTimerRef.current)
-      mergeTimerRef.current = null
-    }
-    try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
-
-    dispatch({ type: 'RESET' })
-    log('Info', `Loading design: ${fileName}`)
-
-    if (fullPath) {
-      try {
-        const raw = localStorage.getItem(RECENT_FILES_KEY)
-        console.log('[recentFiles] raw before add:', raw)
-        const list: string[] = raw ? JSON.parse(raw) : []
-        const next = [fullPath, ...list.filter((p) => p !== fullPath)].slice(0, 10)
-        localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(next))
-        dispatch({ type: 'SET_RECENT_FILES', files: next })
-        console.log('[recentFiles] added', fullPath, 'total', next.length, 'list:', next)
-      } catch (err) {
-        console.error('[recentFiles] failed to add', fullPath, err)
-      }
-    }
-
-    const initialBoard = parseDsn(content)
-    dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
-    dispatch({ type: 'SET_DSN_FILE', fileName })
-    dispatch({ type: 'SET_DSN_CONTENT', content })
-    log('Info', `Parsed DSN: ${initialBoard.components.length} components, ${initialBoard.traces.length} traces, ${initialBoard.vias.length} vias`)
-
-    log('Info', 'Creating FreeRouting session...')
-    const session = await createSession()
-    dispatch({ type: 'SET_SESSION', sessionId: session.id })
-    log('Info', `Session created: ${session.id}`)
-
-    const job = await createJob(session.id)
-    dispatch({ type: 'SET_JOB', jobId: job.id })
-    log('Info', `Job enqueued: ${job.id}`)
-
-    log('Info', 'Uploading DSN to backend...')
-    await uploadDsn(job.id, fileName, content)
-    log('Info', 'DSN uploaded. Ready to route.')
-  }
-
   const startRoutingOnJob = async (jobId: string) => {
     const settings = state.routingSettings
     const hasSettings = settings && Object.keys(settings).length > 0
@@ -313,7 +278,7 @@ export default function MenuBar() {
     }
     try {
       const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
-      await loadDsnFromContent(content, fileName, path)
+      await loadDsnFromContent(dispatch, content, fileName, path)
     } catch (err) {
       log('Error', `Failed to load DSN: ${err}`)
     }
@@ -328,7 +293,7 @@ export default function MenuBar() {
     }
     const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
     try {
-      await loadDsnFromContent(content, fileName, path)
+      await loadDsnFromContent(dispatch, content, fileName, path)
     } catch (err) {
       log('Error', `Failed to load DSN: ${err}`)
     }
@@ -360,7 +325,7 @@ export default function MenuBar() {
     try {
       const content = await file.text()
       if (!content) return
-      await loadDsnFromContent(content, file.name, undefined)
+      await loadDsnFromContent(dispatch, content, file.name, undefined)
     } catch (err) {
       console.error('Failed to read selected file:', err)
       dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
@@ -468,30 +433,39 @@ export default function MenuBar() {
       </div>
 
       {aboutOpen && (
-        <div style={s.modalOverlay} onClick={() => setAboutOpen(false)}>
-          <div style={s.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={s.modalContent}>
+          <div style={s.modalHeader}>
             <h2 style={s.modalTitle}>FreeRouting Desktop</h2>
-            <div style={s.modalBody}>
-              <p style={s.modalRow}>
-                <strong>{t('version', state.language)}:</strong> {appVersion || 'dev'}
-              </p>
-              <p style={s.modalRow}>{t('description', state.language)}</p>
-              <p style={s.modalRow}>
-                <strong>{t('repository', state.language)}:</strong>{' '}
-                <span
-                  style={s.modalLink}
-                  onClick={() => window.openURL('https://github.com/easyeda2021/freerouting-desktop')}
-                >
-                  https://github.com/easyeda2021/freerouting-desktop
-                </span>
-              </p>
-              <p style={s.modalRow}>
-                <strong>{t('author', state.language)}:</strong> easyeda2021
-              </p>
-            </div>
-            <div style={s.modalFooter}>
-              <button style={s.modalOkBtn} onClick={() => setAboutOpen(false)}>{t('ok', state.language)}</button>
-            </div>
+            <button style={s.modalCloseBtn} onClick={() => setAboutOpen(false)} aria-label="Close">×</button>
+          </div>
+          <div style={s.modalBody}>
+            <p style={s.modalRow}>{t('description', state.language)}</p>
+            <ul style={s.modalFeatureList}>
+              <li>{t('featureDsnOpen', state.language)}</li>
+              <li>{t('featureDragDrop', state.language)}</li>
+              <li>{t('featureRealtimePreview', state.language)}</li>
+              <li>{t('featureLayerControl', state.language)}</li>
+              <li>{t('featureRatsnest', state.language)}</li>
+              <li>{t('featureDrc', state.language)}</li>
+            </ul>
+            <p style={s.modalRow}>
+              <strong>{t('version', state.language)}:</strong> {appVersion || 'dev'}
+            </p>
+            <p style={s.modalRow}>
+              <strong>{t('repository', state.language)}:</strong>{' '}
+              <span
+                style={s.modalLink}
+                onClick={() => window.openURL('https://github.com/easyeda2021/freerouting-desktop')}
+              >
+                https://github.com/easyeda2021/freerouting-desktop
+              </span>
+            </p>
+            <p style={s.modalRow}>
+              <strong>{t('author', state.language)}:</strong> easyeda2021
+            </p>
+          </div>
+          <div style={s.modalFooter}>
+            <button style={s.modalOkBtn} onClick={() => setAboutOpen(false)}>{t('ok', state.language)}</button>
           </div>
         </div>
       )}
@@ -515,12 +489,14 @@ const s: Record<string, React.CSSProperties> = {
   dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-all', lineHeight: '1.4' },
   dropdownEmpty: { padding: '6px 10px', fontSize: 11, color: '#888', fontStyle: 'italic' },
   helpBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0, border: '1px solid #4a5568', borderRadius: '50%', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 14, fontWeight: 'bold' },
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 },
-  modalContent: { background: '#16213e', borderRadius: 10, padding: '28px 32px', minWidth: 360, maxWidth: 480, border: '1px solid #0f3460', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' },
-  modalTitle: { margin: '0 0 16px 0', color: '#e94560', fontSize: 18, textAlign: 'center' },
-  modalBody: { color: '#ccc', fontSize: 13, lineHeight: 1.6 },
-  modalRow: { margin: '8px 0' },
+  modalContent: { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', background: '#16213e', borderRadius: 12, padding: '36px 44px', width: 520, maxWidth: '90vw', border: '1px solid #0f3460', boxShadow: '0 16px 50px rgba(0,0,0,0.6)', zIndex: 2000 },
+  modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  modalTitle: { margin: 0, color: '#e94560', fontSize: 22 },
+  modalCloseBtn: { width: 32, height: 32, border: 'none', borderRadius: '50%', background: 'transparent', color: '#888', cursor: 'pointer', fontSize: 22, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  modalBody: { color: '#ccc', fontSize: 14, lineHeight: 1.7 },
+  modalRow: { margin: '10px 0' },
+  modalFeatureList: { margin: '12px 0', paddingLeft: 20, color: '#aaa', fontSize: 13, lineHeight: 1.8 },
   modalLink: { color: '#5ac8fa', textDecoration: 'underline', cursor: 'pointer', wordBreak: 'break-all' },
-  modalFooter: { display: 'flex', justifyContent: 'center', marginTop: 20 },
-  modalOkBtn: { padding: '6px 24px', border: 'none', borderRadius: 6, background: '#e94560', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
+  modalFooter: { display: 'flex', justifyContent: 'center', marginTop: 28 },
+  modalOkBtn: { padding: '8px 32px', border: 'none', borderRadius: 6, background: '#e94560', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500 },
 }
