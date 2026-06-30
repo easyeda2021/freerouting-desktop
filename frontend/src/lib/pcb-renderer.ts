@@ -258,13 +258,11 @@ export function createPcbRenderer(container: HTMLElement) {
               y: pin.y,
               rotation: pin.rotation,
             })
-            renderShape(shape, g, color)
             const padNet = pinToNet.get(`${comp.refdes}-${pin.pinNumber}`)
             const isPadSelected = selectedObject?.type === 'pad' && selectedObject.id === `${comp.refdes}-${pin.pinNumber}-${layer}`
             const isPadNetSelected = selectedNet !== null && padNet === selectedNet
-            if (isPadSelected || isPadNetSelected) {
-              addPadHighlight(g, shape)
-            }
+            const isPadHighlighted = isPadSelected || isPadNetSelected
+            renderShape(shape, g, color, isPadHighlighted)
             if (options.onSelectPad) {
               g.on('pointer.down', () =>
                 options.onSelectPad!({
@@ -552,15 +550,9 @@ export function createPcbRenderer(container: HTMLElement) {
   return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement, drawCrosshair }
 }
 
-function addPadHighlight(group: Group, _shape: ShapeData) {
-  // Match trace/via highlighting: turn the pad fill/stroke white
-  group.children.forEach((child: any) => {
-    if (child.fill !== undefined) child.fill = '#ffffff'
-    if (child.stroke !== undefined) child.stroke = '#ffffff'
-  })
-}
-
-function renderShape(shape: ShapeData, group: Group, color: string) {
+function renderShape(shape: ShapeData, group: Group, color: string, highlight = false) {
+  const fill = highlight ? '#ffffff' : color
+  const stroke = highlight ? '#ffffff' : darken(color)
   if (shape.shapeType === 'circle') {
     const d = shape.params[0]
     group.add(
@@ -569,8 +561,8 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
         y: -d / 2,
         width: d,
         height: d,
-        fill: color,
-        stroke: darken(color),
+        fill,
+        stroke,
         strokeWidth: Math.max(d * 0.04, 1),
       })
     )
@@ -582,8 +574,8 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
         y: y1,
         width: x2 - x1,
         height: y2 - y1,
-        fill: color,
-        stroke: darken(color),
+        fill,
+        stroke,
         strokeWidth: Math.max((x2 - x1) * 0.03, 1),
       })
     )
@@ -608,8 +600,8 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
             y: y1 - width / 2,
             width,
             height: width,
-            fill: color,
-            stroke: darken(color),
+            fill,
+            stroke,
             strokeWidth: Math.max(width * 0.04, 1),
           })
         )
@@ -626,8 +618,8 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
             width: length,
             height: width,
             cornerRadius: width / 2,
-            fill: color,
-            stroke: darken(color),
+            fill,
+            stroke,
             strokeWidth: Math.max(width * 0.04, 1),
           })
         )
@@ -650,8 +642,8 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
         group.add(
           new Polygon({
             points: deduped,
-            fill: color,
-            stroke: darken(color),
+            fill,
+            stroke,
             strokeWidth: Math.max(shape.params[0] * 0.5, 0.5),
           })
         )
