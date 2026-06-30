@@ -17,6 +17,7 @@ var (
 	procGetWindowRect    = user32.NewProc("GetWindowRect")
 	procSendMessageW        = user32.NewProc("SendMessageW")
 	procLoadImageW          = user32.NewProc("LoadImageW")
+	procShowWindow          = user32.NewProc("ShowWindow")
 	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
 	procBringWindowToTop    = user32.NewProc("BringWindowToTop")
 	kernel32                = syscall.NewLazyDLL("kernel32.dll")
@@ -33,9 +34,15 @@ const (
 )
 
 const (
-	imageIcon    = 1
+	imageIcon     = 1
 	lrDefaultSize = 0x0040
 	lrShared      = 0x8000
+)
+
+const (
+	swHide    = 0
+	swShow    = 5
+	swRestore = 9
 )
 
 func screenSize() (int, int) {
@@ -45,21 +52,33 @@ func screenSize() (int, int) {
 }
 
 func prepareWindow(win unsafe.Pointer, width, height int) {
-	hwnd := uintptr(win)
+	// webview_go may create the window at a default small size before we can
+	// resize it. Find the actual top-level window by title and hide it first,
+	// then apply size/icon and show it to avoid the startup flash.
+	title := "FreeRouting Desktop " + version
+	var hwnd uintptr
+	for i := 0; i < 50 && hwnd == 0; i++ {
+		hwnd = findWindow(title)
+		if hwnd == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	if hwnd == 0 {
-		// Fallback: find the window asynchronously by title.
-		centerWindow(width, height)
+		hwnd = uintptr(win)
+	}
+	if hwnd == 0 {
 		return
 	}
 	mainHwnd = hwnd
+	procShowWindow.Call(hwnd, uintptr(swHide))
 	setWindowSizeAndCenter(hwnd, width, height)
 	setWindowIcon(hwnd)
+	procShowWindow.Call(hwnd, uintptr(swShow))
 	bringWindowToForeground(hwnd)
 }
 
 func centerWindow(width, height int) {
-	// Find the window by title and center it using Win32 API.
-	// We retry a few times since the window may not be ready immediately.
+	// Legacy fallback: find the window asynchronously by title.
 	go func() {
 		for i := 0; i < 20; i++ {
 			time.Sleep(100 * time.Millisecond)
