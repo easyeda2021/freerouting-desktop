@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type Dispatch } from 'react'
-import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement } from './lib/board-types'
+import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement, Lang, DisplayUnit } from './lib/board-types'
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -34,6 +34,7 @@ interface AppState {
   score: number
   logEntries: LogEntry[]
   layerVisibility: Record<string, boolean>
+  layerColors: Record<string, string>
   routingSettings: RoutingSettings
   nets: NetInfo[]
   selectedNet: string | null
@@ -42,6 +43,8 @@ interface AppState {
   recentFiles: string[]
   measurement: Measurement
   panTarget: { x: number; y: number } | null
+  displayUnit: DisplayUnit
+  language: Lang
 }
 
 type Action =
@@ -56,6 +59,7 @@ type Action =
   | { type: 'ADD_LOG'; entry: LogEntry }
   | { type: 'SET_SCORE'; score: number }
   | { type: 'TOGGLE_LAYER'; layer: string }
+  | { type: 'SET_LAYER_COLOR'; layer: string; color: string }
   | { type: 'SET_ROUTING_SETTINGS'; settings: RoutingSettings }
   | { type: 'SET_NETS'; nets: NetInfo[] }
   | { type: 'TOGGLE_NET_VISIBILITY'; netName: string }
@@ -66,6 +70,8 @@ type Action =
   | { type: 'SET_RECENT_FILES'; files: string[] }
   | { type: 'SET_MEASUREMENT'; measurement: Partial<Measurement> }
   | { type: 'SET_PAN_TARGET'; target: { x: number; y: number } | null }
+  | { type: 'SET_DISPLAY_UNIT'; unit: DisplayUnit }
+  | { type: 'SET_LANGUAGE'; lang: Lang }
   | { type: 'RESET' }
 
 const initialState: AppState = {
@@ -85,6 +91,7 @@ const initialState: AppState = {
   score: 0,
   logEntries: [],
   layerVisibility: {},
+  layerColors: {},
   routingSettings: {},
   nets: [],
   selectedNet: null,
@@ -93,6 +100,8 @@ const initialState: AppState = {
   recentFiles: [],
   measurement: { start: null, end: null, cursor: null, active: false },
   panTarget: null,
+  displayUnit: 'mm',
+  language: 'zh',
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -113,6 +122,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_BOARD_DATA': {
       const visibility: Record<string, boolean> = {}
       action.data.layers.forEach((l) => { visibility[l.name] = state.layerVisibility[l.name] ?? true })
+      visibility['ratsnest'] = state.layerVisibility['ratsnest'] ?? true
       return { ...state, boardData: action.data, layerVisibility: visibility }
     }
     case 'MERGE_BOARD_DATA': {
@@ -138,10 +148,12 @@ function reducer(state: AppState, action: Action): AppState {
         components: existing.components,
         padstacks: mergeByKey(existing.padstacks, incoming.padstacks, (p) => p.name),
         images: existing.images,
+        netPins: existing.netPins,
       }
 
       const visibility: Record<string, boolean> = {}
       merged.layers.forEach((l) => { visibility[l.name] = state.layerVisibility[l.name] ?? true })
+      visibility['ratsnest'] = state.layerVisibility['ratsnest'] ?? true
       return { ...state, boardData: merged, layerVisibility: visibility }
     }
     case 'ADD_LOG':
@@ -155,6 +167,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, score: action.score }
     case 'TOGGLE_LAYER':
       return { ...state, layerVisibility: { ...state.layerVisibility, [action.layer]: !state.layerVisibility[action.layer] } }
+    case 'SET_LAYER_COLOR':
+      return { ...state, layerColors: { ...state.layerColors, [action.layer]: action.color } }
     case 'SET_ROUTING_SETTINGS':
       return { ...state, routingSettings: { ...state.routingSettings, ...action.settings } }
     case 'SET_NETS':
@@ -181,8 +195,19 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, measurement: { ...state.measurement, ...action.measurement } }
     case 'SET_PAN_TARGET':
       return { ...state, panTarget: action.target }
+    case 'SET_DISPLAY_UNIT':
+      return { ...state, displayUnit: action.unit }
+    case 'SET_LANGUAGE':
+      return { ...state, language: action.lang }
     case 'RESET':
-      return { ...initialState, frStatus: state.frStatus, frVersion: state.frVersion }
+      return {
+        ...initialState,
+        frStatus: state.frStatus,
+        frVersion: state.frVersion,
+        displayUnit: state.displayUnit,
+        language: state.language,
+        routingSettings: state.routingSettings,
+      }
     default:
       return state
   }

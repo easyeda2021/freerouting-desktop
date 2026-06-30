@@ -1,4 +1,4 @@
-import type { BoardData, ViaData, PinData, ShapeData, OutlineData } from './board-types'
+import type { BoardData, ViaData, PinData, ShapeData, OutlineData, NetPinRef } from './board-types'
 
 type Token =
   | { type: 'open' }
@@ -184,6 +184,7 @@ export function parseDsn(content: string): BoardData {
     components: [],
     padstacks: [],
     images: [],
+    netPins: {},
   }
 
   const layerSet = new Set<string>()
@@ -300,6 +301,20 @@ export function parseDsn(content: string): BoardData {
           addPath(sub, netName)
         }
 
+        if (sub[0] === 'pins') {
+          const refs: NetPinRef[] = []
+          for (let k = 1; k < sub.length; k++) {
+            const token = String(sub[k])
+            const idx = token.lastIndexOf('-')
+            if (idx > 0) {
+              refs.push({ refdes: token.slice(0, idx), pinNumber: token.slice(idx + 1) })
+            }
+          }
+          if (refs.length > 0) {
+            boardData.netPins[netName] = refs
+          }
+        }
+
         if (sub[0] === 'via') {
           const via: ViaData = {
             netName,
@@ -408,5 +423,5 @@ export function parseDsn(content: string): BoardData {
 }
 
 function emptyBoard(): BoardData {
-  return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [], images: [] }
+  return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [], images: [], netPins: {} }
 }

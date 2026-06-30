@@ -22,9 +22,10 @@ type FreeRoutingStatus struct {
 }
 
 type Config struct {
-	BinPath     string   `json:"bin_path"`
-	LastDir     string   `json:"last_dir"`
-	RecentFiles []string `json:"recent_files,omitempty"`
+	BinPath         string                 `json:"bin_path"`
+	LastDir         string                 `json:"last_dir"`
+	RecentFiles     []string               `json:"recent_files,omitempty"`
+	RoutingSettings map[string]interface{} `json:"routing_settings,omitempty"`
 }
 
 var (
@@ -190,6 +191,18 @@ func addRecentFile(path string) {
 	cfg.RecentFiles = newList
 	if err := saveConfig(cfg); err != nil {
 		log.Printf("addRecentFile failed: %v", err)
+	}
+}
+
+func getRoutingSettings() map[string]interface{} {
+	return loadConfig().RoutingSettings
+}
+
+func saveRoutingSettings(settings map[string]interface{}) {
+	cfg := loadConfig()
+	cfg.RoutingSettings = settings
+	if err := saveConfig(cfg); err != nil {
+		log.Printf("saveRoutingSettings failed: %v", err)
 	}
 }
 

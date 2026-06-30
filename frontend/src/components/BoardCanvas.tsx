@@ -146,6 +146,7 @@ export default function BoardCanvas() {
         rendererRef.current.render(state.boardData, state.layerVisibility, {
           hiddenNets,
           selectedNet: state.selectedNet,
+          layerColors: state.layerColors,
           onSelectTrace: (trace) => dispatch({ type: 'SELECT_NET', netName: trace.netName || null }),
           onSelectVia: (via) => dispatch({ type: 'SELECT_NET', netName: via.netName || null }),
           onSelectComponent: (comp) => dispatch({ type: 'SELECT_OBJECT', object: { type: 'component', id: comp.refdes, refdes: comp.refdes } }),
@@ -163,7 +164,7 @@ export default function BoardCanvas() {
       hasFittedRef.current = false
       prevDsnRef.current = null
     }
-  }, [state.boardData, state.layerVisibility, state.nets, state.selectedNet, state.currentDsn, dispatch])
+  }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.currentDsn, dispatch])
 
   useEffect(() => {
     rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)

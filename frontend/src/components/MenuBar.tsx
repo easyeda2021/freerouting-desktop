@@ -4,6 +4,7 @@ import { createSession, createJob, uploadDsn, startRouting, cancelRouting, setJo
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
 import type { BoardData, LogEntry, DrcViolation } from '../lib/board-types'
+import { t } from '../lib/i18n'
 
 function parseDrcResponse(data: unknown): DrcViolation[] {
   if (!data || typeof data !== 'object') return []
@@ -34,6 +35,8 @@ declare global {
     readFile: (path: string) => Promise<string> | string
     getRecentFiles: () => Promise<string[]> | string[]
     addRecentFile: (path: string) => Promise<void> | void
+    getRoutingSettings: () => Promise<Record<string, unknown>> | Record<string, unknown>
+    saveRoutingSettings: (settings: Record<string, unknown>) => Promise<void> | void
   }
 }
 
@@ -44,6 +47,7 @@ export default function MenuBar() {
   const pendingMergeRef = useRef<BoardData | null>(null)
   const mergeTimerRef = useRef<number | null>(null)
   const jobStartedRef = useRef(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [recentOpen, setRecentOpen] = useState(false)
 
   useEffect(() => {
@@ -52,8 +56,27 @@ export default function MenuBar() {
         const files = window.getRecentFiles ? await window.getRecentFiles() : []
         dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
       } catch { /* ignore */ }
+      try {
+        if (window.getRoutingSettings) {
+          const saved = await window.getRoutingSettings()
+          if (saved && typeof saved === 'object') {
+            dispatch({ type: 'SET_ROUTING_SETTINGS', settings: saved as Record<string, string | number | boolean | undefined> })
+          }
+        }
+      } catch { /* ignore */ }
     })()
   }, [dispatch])
+
+  useEffect(() => {
+    if (!recentOpen) return
+    const onMouseDown = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setRecentOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [recentOpen])
 
   const log = (type: 'Info' | 'Warn' | 'Error', message: string, topic = 'App') => {
     dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type, message, topic } })
@@ -298,6 +321,14 @@ export default function MenuBar() {
     })
   }
 
+  const toggleUnit = () => {
+    dispatch({ type: 'SET_DISPLAY_UNIT', unit: state.displayUnit === 'mm' ? 'mil' : 'mm' })
+  }
+
+  const toggleLanguage = () => {
+    dispatch({ type: 'SET_LANGUAGE', lang: state.language === 'zh' ? 'en' : 'zh' })
+  }
+
   const handleFileInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -347,22 +378,22 @@ export default function MenuBar() {
       />
       <div style={s.bar}>
         <div style={s.left}>
-          <div style={s.dropdownContainer}>
+          <div ref={dropdownRef} style={s.dropdownContainer}>
             <button style={s.openBtn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
-              Open DSN
+              {t('openDsn', state.language)}
             </button>
             <button
               style={s.dropdownToggle}
               onClick={() => setRecentOpen((v) => !v)}
               disabled={state.frStatus !== 'ready'}
-              title="Recent files"
+              title={t('recentFiles', state.language)}
             >
               ▼
             </button>
             {recentOpen && (
               <div style={s.dropdownMenu}>
                 {recentFiles.length === 0 ? (
-                  <div style={s.dropdownEmpty}>No recent files</div>
+                  <div style={s.dropdownEmpty}>{t('noRecentFiles', state.language)}</div>
                 ) : (
                   recentFiles.map((path) => {
                     const safePath = String(path)
@@ -383,26 +414,30 @@ export default function MenuBar() {
             )}
           </div>
           <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
-            Export SES
+            {t('exportSes', state.language)}
           </button>
           {state.jobState === 'RUNNING' ? (
             <button style={s.btn} onClick={handleStopRouting}>
-              Stop Routing
+              {t('stopRouting', state.language)}
             </button>
           ) : (
             <button style={s.btn} onClick={handleStartRouting} disabled={!state.jobId}>
-              Start Route
+              {t('startRoute', state.language)}
             </button>
           )}
           <button
             style={s.btn}
             onClick={toggleMeasurement}
-            title="Measure distance (click two points on the canvas, right-click to exit)"
+            title={t('measure', state.language)}
           >
-            Measure
+            {t('measure', state.language)}
           </button>
         </div>
-        <span style={s.fileName}>{state.currentDsn || ''}</span>
+        <div style={s.right}>
+          <button style={s.toggleBtn} onClick={toggleUnit}>{state.displayUnit.toUpperCase()}</button>
+          <button style={s.toggleBtn} onClick={toggleLanguage}>{state.language === 'zh' ? '中' : 'EN'}</button>
+          <span style={s.fileName}>{state.currentDsn || ''}</span>
+        </div>
       </div>
     </>
   )
@@ -413,7 +448,9 @@ const s: Record<string, React.CSSProperties> = {
   left: { display: 'flex', alignItems: 'center', gap: 8 },
   btn: { padding: '5px 16px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
   activeBtn: { background: '#e94560', borderColor: '#e94560' },
-  fileName: { fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  fileName: { fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  right: { display: 'flex', alignItems: 'center', gap: 8 },
+  toggleBtn: { padding: '3px 10px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' },
   dropdownContainer: { position: 'relative', display: 'flex', alignItems: 'stretch' },
   openBtn: { padding: '5px 12px', border: '1px solid #4a5568', borderRadius: '4px 0 0 4px', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
   dropdownToggle: { padding: '5px 6px', border: '1px solid #4a5568', borderLeft: 'none', borderRadius: '0 4px 4px 0', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 10, fontWeight: 500 },

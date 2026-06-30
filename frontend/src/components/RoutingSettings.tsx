@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useApp } from '../App'
 import type { RoutingSettings } from '../lib/board-types'
+import { t } from '../lib/i18n'
 
 const SETTINGS_KEY = 'fr_routing_settings'
 
@@ -32,16 +33,39 @@ function saveStoredSettings(settings: RoutingSettings) {
 
 export default function RoutingSettings() {
   const { state, dispatch } = useApp()
+  const { language } = state
   const settings = { ...defaultSettings, ...state.routingSettings }
 
   useEffect(() => {
-    dispatch({ type: 'SET_ROUTING_SETTINGS', settings: loadStoredSettings() })
+    const init = async () => {
+      let saved: RoutingSettings = {}
+      try {
+        if ('getRoutingSettings' in window) {
+          const remote = await window.getRoutingSettings()
+          saved = (remote && typeof remote === 'object' ? remote : {}) as RoutingSettings
+        }
+      } catch { /* ignore */ }
+      if (Object.keys(saved).length === 0) {
+        saved = loadStoredSettings()
+      }
+      dispatch({ type: 'SET_ROUTING_SETTINGS', settings: { ...defaultSettings, ...saved } })
+    }
+    init()
   }, [dispatch])
+
+  const save = async (next: RoutingSettings) => {
+    saveStoredSettings(next)
+    try {
+      if ('saveRoutingSettings' in window) {
+        await window.saveRoutingSettings(next)
+      }
+    } catch { /* ignore */ }
+  }
 
   const update = (patch: Partial<RoutingSettings>) => {
     const next = { ...settings, ...patch }
     dispatch({ type: 'SET_ROUTING_SETTINGS', settings: patch })
-    saveStoredSettings(next)
+    save(next)
   }
 
   const row = (label: string, child: React.ReactNode) => (
@@ -53,17 +77,17 @@ export default function RoutingSettings() {
 
   return (
     <div style={s.panel}>
-      <h3 style={s.title}>Routing Settings</h3>
-      {row('Max passes', <input style={s.input} type="number" min={1} max={50} value={settings.max_passes} onChange={(e) => update({ max_passes: Number(e.target.value) })} />)}
-      {row('Via costs', <input style={s.input} type="number" min={0} value={settings.via_costs} onChange={(e) => update({ via_costs: Number(e.target.value) })} />)}
-      {row('Plane via costs', <input style={s.input} type="number" min={0} value={settings.plane_via_costs} onChange={(e) => update({ plane_via_costs: Number(e.target.value) })} />)}
-      {row('Ripup costs', <input style={s.input} type="number" min={0} value={settings.start_ripup_costs} onChange={(e) => update({ start_ripup_costs: Number(e.target.value) })} />)}
-      {row('Improve threshold', <input style={s.input} type="number" step={0.001} value={settings.improvement_threshold} onChange={(e) => update({ improvement_threshold: Number(e.target.value) })} />)}
-      {row('Pref. dir cost', <input style={s.input} type="number" step={0.1} value={settings.default_preferred_direction_trace_cost} onChange={(e) => update({ default_preferred_direction_trace_cost: Number(e.target.value) })} />)}
-      {row('Undesired cost', <input style={s.input} type="number" step={0.1} value={settings.default_undesired_direction_trace_cost} onChange={(e) => update({ default_undesired_direction_trace_cost: Number(e.target.value) })} />)}
-      {row('Fanout', <input type="checkbox" checked={settings.fanout_enabled} onChange={(e) => update({ fanout_enabled: e.target.checked })} />)}
-      {row('Optimizer', <input type="checkbox" checked={settings.optimizer_enabled} onChange={(e) => update({ optimizer_enabled: e.target.checked })} />)}
-      <button style={s.reset} onClick={() => update({ ...defaultSettings })}>Reset defaults</button>
+      <h3 style={s.title}>{t('routingSettings', language)}</h3>
+      {row(t('maxPasses', language), <input style={s.input} type="number" min={1} max={50} value={settings.max_passes} onChange={(e) => update({ max_passes: Number(e.target.value) })} />)}
+      {row(t('viaCosts', language), <input style={s.input} type="number" min={0} value={settings.via_costs} onChange={(e) => update({ via_costs: Number(e.target.value) })} />)}
+      {row(t('planeViaCosts', language), <input style={s.input} type="number" min={0} value={settings.plane_via_costs} onChange={(e) => update({ plane_via_costs: Number(e.target.value) })} />)}
+      {row(t('ripupCosts', language), <input style={s.input} type="number" min={0} value={settings.start_ripup_costs} onChange={(e) => update({ start_ripup_costs: Number(e.target.value) })} />)}
+      {row(t('improveThreshold', language), <input style={s.input} type="number" step={0.001} value={settings.improvement_threshold} onChange={(e) => update({ improvement_threshold: Number(e.target.value) })} />)}
+      {row(t('preferredDirCost', language), <input style={s.input} type="number" step={0.1} value={settings.default_preferred_direction_trace_cost} onChange={(e) => update({ default_preferred_direction_trace_cost: Number(e.target.value) })} />)}
+      {row(t('undesiredDirCost', language), <input style={s.input} type="number" step={0.1} value={settings.default_undesired_direction_trace_cost} onChange={(e) => update({ default_undesired_direction_trace_cost: Number(e.target.value) })} />)}
+      {row(t('fanout', language), <input type="checkbox" checked={settings.fanout_enabled} onChange={(e) => update({ fanout_enabled: e.target.checked })} />)}
+      {row(t('optimizer', language), <input type="checkbox" checked={settings.optimizer_enabled} onChange={(e) => update({ optimizer_enabled: e.target.checked })} />)}
+      <button style={s.reset} onClick={() => update({ ...defaultSettings })}>{t('resetDefaults', language)}</button>
     </div>
   )
 }

@@ -1,10 +1,11 @@
 import { App, Line, Ellipse, Group, Rect, Polygon, Text } from 'leafer-ui'
 import '@leafer-in/view'
-import type { BoardData, ShapeData, TraceData, ViaData, ComponentData, SelectedObject } from './board-types'
+import type { BoardData, ShapeData, TraceData, ViaData, ComponentData, SelectedObject, NetPinRef } from './board-types'
+import { getLayerColor } from './layer-colors'
 
-const LAYER_COLORS = ['#e94560', '#0f3460', '#16c79a', '#f5a623', '#a855f7', '#06b6d4', '#84cc16', '#ec4899']
 const VIA_COLOR = '#a0a0a0'
 const VIA_STROKE = '#555555'
+const RATSNEST_COLOR = '#00bfff'
 
 export function createPcbRenderer(container: HTMLElement) {
   const app = new App({
@@ -57,6 +58,7 @@ export function createPcbRenderer(container: HTMLElement) {
     options: {
       hiddenNets?: Set<string>
       selectedNet?: string | null
+      layerColors?: Record<string, string>
       onSelectTrace?: (trace: TraceData) => void
       onSelectVia?: (via: ViaData) => void
       onSelectComponent?: (comp: ComponentData) => void
@@ -72,6 +74,7 @@ export function createPcbRenderer(container: HTMLElement) {
       const outlineWidth = Math.max(bounds.maxDim * 0.002, 1)
       const hiddenNets = options.hiddenNets || new Set<string>()
       const selectedNet = options.selectedNet || null
+      const layerColors = options.layerColors || {}
 
       // Group traces by layer
       for (const trace of data.traces) {
@@ -90,7 +93,7 @@ export function createPcbRenderer(container: HTMLElement) {
         const line = new Line({
           points,
           strokeWidth: isOutline ? outlineWidth : Math.max(trace.width, 0.5),
-          stroke: isOutline ? '#e0e0e0' : (isSelected ? '#ffffff' : getLayerColor(trace.layer)),
+          stroke: isOutline ? '#e0e0e0' : (isSelected ? '#ffffff' : getLayerColor(trace.layer, layerColors)),
           strokeCap: 'round',
           strokeJoin: 'round',
         })
@@ -228,7 +231,7 @@ export function createPcbRenderer(container: HTMLElement) {
               }
             }
             if (visibility[layer] === false) continue
-            const color = getLayerColor(layer)
+            const color = getLayerColor(layer, layerColors)
             const g = new Group({
               x: pin.x,
               y: pin.y,
@@ -250,6 +253,13 @@ export function createPcbRenderer(container: HTMLElement) {
           }
         }
         padGroup.add(compBase)
+      }
+
+      // Render ratsnest airwires
+      const ratsnestGroup = new Group({})
+      app.tree.add(ratsnestGroup)
+      if (visibility['ratsnest'] !== false) {
+        drawRatsnest(data, ratsnestGroup, hiddenNets, selectedNet, layerColors, bounds.maxDim)
       }
 
     } catch (e) {
@@ -603,6 +613,78 @@ function renderShape(shape: ShapeData, group: Group, color: string) {
   }
 }
 
+function padWorldPos(comp: ComponentData, pin: NetPinRef | { x: number; y: number; rotation?: number }): [number, number] {
+  const rad = ((comp.rotation || 0) * Math.PI) / 180
+  let x = 'x' in pin ? pin.x : 0
+  let y = 'x' in pin ? pin.y : 0
+  let rx = x * Math.cos(rad) - y * Math.sin(rad)
+  let ry = x * Math.sin(rad) + y * Math.cos(rad)
+  if (comp.side === 'back') rx = -rx
+  return [comp.location[0] + rx, comp.location[1] + ry]
+}
+
+function mstEdges(points: [number, number][]): Array<[number, number, number, number]> {
+  if (points.length < 2) return []
+  const edges: Array<{ i: number; j: number; d: number }> = []
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const dx = points[i][0] - points[j][0]
+      const dy = points[i][1] - points[j][1]
+      edges.push({ i, j, d: Math.hypot(dx, dy) })
+    }
+  }
+  edges.sort((a, b) => a.d - b.d)
+  const parent = Array.from({ length: points.length }, (_, i) => i)
+  const find = (x: number): number => parent[x] === x ? x : parent[x] = find(parent[x])
+  const union = (a: number, b: number) => { parent[find(a)] = find(b) }
+  const result: Array<[number, number, number, number]> = []
+  for (const e of edges) {
+    if (find(e.i) !== find(e.j)) {
+      union(e.i, e.j)
+      result.push([points[e.i][0], points[e.i][1], points[e.j][0], points[e.j][1]])
+    }
+  }
+  return result
+}
+
+function drawRatsnest(
+  data: BoardData,
+  group: Group,
+  hiddenNets: Set<string>,
+  selectedNet: string | null,
+  layerColors: Record<string, string>,
+  maxDim: number
+) {
+  if (!data.netPins || Object.keys(data.netPins).length === 0) return
+  const imageMap = new Map(data.images.map((img) => [img.name, img]))
+  const componentMap = new Map(data.components.map((c) => [c.refdes, c]))
+  const lineWidth = Math.max(maxDim * 0.0015, 1)
+
+  for (const [netName, refs] of Object.entries(data.netPins)) {
+    if (hiddenNets.has(netName)) continue
+    const points: [number, number][] = []
+    for (const ref of refs) {
+      const comp = componentMap.get(ref.refdes)
+      const image = comp ? imageMap.get(comp.package) : undefined
+      const pin = image?.pins.find((p) => p.pinNumber === ref.pinNumber)
+      if (!comp || !pin) continue
+      points.push(padWorldPos(comp, pin))
+    }
+    const isSelected = selectedNet !== null && netName === selectedNet
+    const color = isSelected ? '#ffffff' : (layerColors['ratsnest'] || RATSNEST_COLOR)
+    for (const [x1, y1, x2, y2] of mstEdges(points)) {
+      group.add(
+        new Line({
+          points: [x1, y1, x2, y2],
+          stroke: color,
+          strokeWidth: lineWidth,
+          strokeCap: 'round',
+        })
+      )
+    }
+  }
+}
+
 function computeBounds(data: BoardData) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   function expand(x: number, y: number) {
@@ -624,11 +706,6 @@ function computeBounds(data: BoardData) {
     minX, minY, maxX, maxY,
     maxDim: Math.max(maxX - minX, maxY - minY, 1),
   }
-}
-
-function getLayerColor(layerName: string): string {
-  const hash = layerName.split('').reduce((h, c) => h + c.charCodeAt(0), 0)
-  return LAYER_COLORS[hash % LAYER_COLORS.length]
 }
 
 function darken(color: string): string {

@@ -1,20 +1,21 @@
 import { useApp } from '../App'
+import { t } from '../lib/i18n'
 
 export default function StatusBar() {
   const { state } = useApp()
-  const { boardData, measurement, selectedObject, selectedNet } = state
+  const { boardData, measurement, selectedObject, selectedNet, displayUnit, language } = state
 
   const resolution = boardData?.resolutionDenominator || 1
-  const unit = boardData?.resolutionUnit || 'um'
 
   function toPhysical(value: number): string {
     // DSN resolution: e.g. (resolution um 10) => 1 coord unit = 0.1 um
     const micrometers = value / resolution
-    if (unit === 'um' || unit === 'micron') {
-      if (Math.abs(micrometers) >= 1000) return `${(micrometers / 1000).toFixed(3)} mm`
-      return `${micrometers.toFixed(1)} um`
+    const mm = micrometers / 1000
+    const mil = micrometers / 25.4
+    if (displayUnit === 'mil') {
+      return `${mil.toFixed(Math.abs(mil) >= 1 ? 2 : 3)} mil`
     }
-    return `${value.toFixed(2)} ${unit}`
+    return `${mm.toFixed(Math.abs(mm) >= 1 ? 2 : 3)} mm`
   }
 
   const cursor = measurement.cursor
@@ -30,19 +31,19 @@ export default function StatusBar() {
             X: {toPhysical(cursor[0])} &nbsp; Y: {toPhysical(cursor[1])}
           </span>
         )}
-        {measurement.active && <span style={s.mode}>Measure mode</span>}
+        {measurement.active && <span style={s.mode}>{t('measureMode', language)}</span>}
         {distance !== null && (
-          <span style={s.distance}>Distance: {toPhysical(distance)}</span>
+          <span style={s.distance}>{t('distance', language)}: {toPhysical(distance)}</span>
         )}
       </div>
       <div style={s.right}>
-        {selectedNet && <span style={s.info}>Net: {selectedNet}</span>}
+        {selectedNet && <span style={s.info}>{t('net', language)}: {selectedNet}</span>}
         {selectedObject && (
           <span style={s.info}>
-            {selectedObject.type === 'component' && `Component: ${selectedObject.refdes}`}
-            {selectedObject.type === 'pad' && `Pad: ${selectedObject.refdes}-${selectedObject.pinNumber} (${selectedObject.layer})`}
-            {selectedObject.type === 'trace' && `Trace: ${selectedObject.netName || 'outline'}`}
-            {selectedObject.type === 'via' && `Via: ${selectedObject.netName || ''}`}
+            {selectedObject.type === 'component' && `${t('component', language)}: ${selectedObject.refdes}`}
+            {selectedObject.type === 'pad' && `${t('pad', language)}: ${selectedObject.refdes}-${selectedObject.pinNumber} (${selectedObject.layer})`}
+            {selectedObject.type === 'trace' && `${t('trace', language)}: ${selectedObject.netName || 'outline'}`}
+            {selectedObject.type === 'via' && `${t('via', language)}: ${selectedObject.netName || ''}`}
           </span>
         )}
       </div>

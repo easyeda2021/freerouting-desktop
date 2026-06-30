@@ -155,6 +155,7 @@ export function parseSes(content: string): BoardData {
     components: [],
     padstacks: [],
     images: [],
+    netPins: {},
   }
 
   const layerSet = new Set<string>()
@@ -278,7 +279,7 @@ export function parseSes(content: string): BoardData {
   return boardData
   } catch (e) {
     console.error('SES parse error:', e)
-    return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [], images: [] }
+    return { resolutionUnit: 'um', resolutionDenominator: 1, layers: [], traces: [], vias: [], components: [], padstacks: [], images: [], netPins: {} }
   }
 }
 

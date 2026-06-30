@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useApp } from '../App'
+import { t } from '../lib/i18n'
 
 export default function NetList() {
   const { state, dispatch } = useApp()
-  const { boardData, nets, selectedNet } = state
+  const { boardData, nets, selectedNet, language } = state
   const [filter, setFilter] = useState('')
 
   useMemo(() => {
@@ -46,10 +47,10 @@ export default function NetList() {
 
   return (
     <div style={s.panel}>
-      <h3 style={s.title}>Nets ({visibleCount}/{nets.length})</h3>
+      <h3 style={s.title}>{t('nets', language)} ({visibleCount}/{nets.length})</h3>
       <input
         style={s.filter}
-        placeholder="Filter nets..."
+        placeholder={language === 'zh' ? '过滤网络...' : 'Filter nets...'}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />

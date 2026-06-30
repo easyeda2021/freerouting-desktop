@@ -55,6 +55,11 @@ export interface PadstackData {
   shapes: ShapeData[]
 }
 
+export interface NetPinRef {
+  refdes: string
+  pinNumber: string
+}
+
 export interface BoardData {
   resolutionUnit: string
   resolutionDenominator: number
@@ -64,7 +69,11 @@ export interface BoardData {
   components: ComponentData[]
   padstacks: PadstackData[]
   images: ImageData[]
+  netPins: Record<string, NetPinRef[]>
 }
+
+export type Lang = 'en' | 'zh'
+export type DisplayUnit = 'mm' | 'mil'
 
 export interface LogEntry {
   timestamp: string
