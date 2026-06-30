@@ -29,18 +29,22 @@ def main():
     icon_png = os.path.join(ROOT, 'images', 'logo.png')
     icon_dst = os.path.join(backend, 'icon.png')
 
+    icon_files = []
     if HAS_PIL:
         with Image.open(icon_png) as img:
-            # go-winres requires icon dimensions to fit in 256x256
-            img = img.resize((256, 256), Image.Resampling.LANCZOS)
-            img.save(icon_dst)
+            for size in [16, 32, 48, 256]:
+                resized = img.resize((size, size), Image.Resampling.LANCZOS)
+                name = f"icon_{size}.png"
+                resized.save(os.path.join(backend, name))
+                icon_files.append(name)
     else:
         import shutil
         shutil.copy2(icon_png, icon_dst)
+        icon_files.append("icon.png")
 
     # Create winres JSON
     winres = {
-        "RT_GROUP_ICON": {"APP": {"0000": ["icon.png"]}},
+        "RT_GROUP_ICON": {"APP": {"0000": icon_files}},
         "RT_VERSION": {
             "#1": {
                 "0000": {

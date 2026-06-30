@@ -8,6 +8,7 @@ frontend/dist/
 backend/dist/
 backend/*.syso
 backend/icon.png
+backend/icon_*.png
 build/
 
 # Go
