@@ -552,76 +552,12 @@ export function createPcbRenderer(container: HTMLElement) {
   return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement, drawCrosshair }
 }
 
-function addPadHighlight(group: Group, shape: ShapeData) {
-  const hl = '#ffffff'
-  const sw = 2.5
-  if (shape.shapeType === 'circle') {
-    const d = shape.params[0] + 6
-    group.add(
-      new Ellipse({
-        x: -d / 2,
-        y: -d / 2,
-        width: d,
-        height: d,
-        fill: 'transparent',
-        stroke: hl,
-        strokeWidth: sw,
-      })
-    )
-  } else if (shape.shapeType === 'rect') {
-    const [x1, y1, x2, y2] = shape.params
-    const pad = 3
-    group.add(
-      new Rect({
-        x: x1 - pad,
-        y: y1 - pad,
-        width: x2 - x1 + pad * 2,
-        height: y2 - y1 + pad * 2,
-        fill: 'transparent',
-        stroke: hl,
-        strokeWidth: sw,
-      })
-    )
-  } else if (shape.shapeType === 'path') {
-    const width = shape.params[0]
-    if (width > 0) {
-      const d = width + 6
-      group.add(
-        new Ellipse({
-          x: -d / 2,
-          y: -d / 2,
-          width: d,
-          height: d,
-          fill: 'transparent',
-          stroke: hl,
-          strokeWidth: sw,
-        })
-      )
-    }
-  } else if (shape.shapeType === 'polygon') {
-    const coords = shape.params.slice(1)
-    if (coords.length >= 6) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (let i = 0; i < coords.length; i += 2) {
-        minX = Math.min(minX, coords[i])
-        minY = Math.min(minY, coords[i + 1])
-        maxX = Math.max(maxX, coords[i])
-        maxY = Math.max(maxY, coords[i + 1])
-      }
-      const pad = 3
-      group.add(
-        new Rect({
-          x: minX - pad,
-          y: minY - pad,
-          width: maxX - minX + pad * 2,
-          height: maxY - minY + pad * 2,
-          fill: 'transparent',
-          stroke: hl,
-          strokeWidth: sw,
-        })
-      )
-    }
-  }
+function addPadHighlight(group: Group, _shape: ShapeData) {
+  // Match trace/via highlighting: turn the pad fill/stroke white
+  group.children.forEach((child: any) => {
+    if (child.fill !== undefined) child.fill = '#ffffff'
+    if (child.stroke !== undefined) child.stroke = '#ffffff'
+  })
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string) {
