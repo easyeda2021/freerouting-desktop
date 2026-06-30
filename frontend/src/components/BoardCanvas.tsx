@@ -12,6 +12,7 @@ export default function BoardCanvas() {
   const hasFittedRef = useRef(false)
   const prevDsnRef = useRef<string | null>(null)
   const measurementRef = useRef(state.measurement)
+  const measurePhaseRef = useRef<'idle' | 'started'>('idle')
 
   useEffect(() => {
     measurementRef.current = state.measurement
@@ -50,7 +51,8 @@ export default function BoardCanvas() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (measurementRef.current.active) {
-          dispatch({ type: 'SET_MEASUREMENT', measurement: { active: false, start: null, end: null } })
+          dispatch({ type: 'SET_MEASUREMENT', measurement: { active: false, start: null, end: null, cursor: null } })
+          measurePhaseRef.current = 'idle'
         }
         return
       }
@@ -69,16 +71,23 @@ export default function BoardCanvas() {
         if (e.button === 2) {
           e.preventDefault()
           dispatch({ type: 'SET_MEASUREMENT', measurement: { active: false, start: null, end: null, cursor: null } })
+          measurePhaseRef.current = 'idle'
           return
         }
         if (e.button === 0) {
           e.preventDefault()
           const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
           if (!pos) return
-          if (!measurementRef.current.start || measurementRef.current.end) {
-            dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
+          updateCrosshair(e)
+          const m = measurementRef.current
+          if (!m.start || m.end) {
+            // Start a new measurement, clearing any previous result
+            dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null, cursor: pos } })
+            measurePhaseRef.current = 'started'
           } else {
+            // Finish current measurement
             dispatch({ type: 'SET_MEASUREMENT', measurement: { end: pos } })
+            measurePhaseRef.current = 'idle'
           }
           return
         }
@@ -175,7 +184,15 @@ export default function BoardCanvas() {
   }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.selectedObject, state.currentDsn, dispatch])
 
   useEffect(() => {
-    rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)
+    if (!state.measurement.active) {
+      rendererRef.current?.clearMeasurement()
+    } else if (state.measurement.start && state.measurement.end) {
+      rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)
+    } else if (state.measurement.start && state.measurement.cursor) {
+      rendererRef.current?.drawMeasurementPreview(state.measurement.start, state.measurement.cursor)
+    } else {
+      rendererRef.current?.clearMeasurement()
+    }
     rendererRef.current?.drawCrosshair(null)
     if (containerRef.current) {
       containerRef.current.style.cursor = state.measurement.active ? 'none' : 'default'

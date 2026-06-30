@@ -461,6 +461,49 @@ export function createPcbRenderer(container: HTMLElement) {
     measurementGroup.add(textGroup)
   }
 
+  function drawMeasurementPreview(start: [number, number] | null, cursor: [number, number] | null) {
+    measurementGroup.clear()
+    if (!start || !cursor) return
+
+    const r = Math.max(lastBounds.maxDim * 0.004, 3)
+    const lineWidth = Math.max(lastBounds.maxDim * 0.0015, 0.5)
+    const color = '#f5a623'
+
+    measurementGroup.add(
+      new Ellipse({
+        x: start[0] - r,
+        y: start[1] - r,
+        width: r * 2,
+        height: r * 2,
+        fill: color,
+        stroke: '#ffffff',
+        strokeWidth: Math.max(r * 0.08, 0.5),
+      })
+    )
+
+    measurementGroup.add(
+      new Ellipse({
+        x: cursor[0] - r,
+        y: cursor[1] - r,
+        width: r * 2,
+        height: r * 2,
+        fill: color,
+        stroke: '#ffffff',
+        strokeWidth: Math.max(r * 0.08, 0.5),
+      })
+    )
+
+    measurementGroup.add(
+      new Line({
+        points: [start[0], start[1], cursor[0], cursor[1]],
+        strokeWidth: lineWidth,
+        stroke: color,
+        strokeCap: 'round',
+        strokeJoin: 'round',
+      })
+    )
+  }
+
   function clearMeasurement() {
     measurementGroup.clear()
   }
@@ -547,7 +590,7 @@ export function createPcbRenderer(container: HTMLElement) {
     tree.y = (tree.y || 0) + dy
   }
 
-  return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement, drawCrosshair }
+  return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, drawMeasurementPreview, clearMeasurement, drawCrosshair }
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string, highlight = false) {
