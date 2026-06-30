@@ -128,7 +128,7 @@ Cross-compilation is limited because `webview_go` depends on CGO and platform-sp
 ## How It Works
 
 1. App starts → Go host detects if FreeRouting is installed on the system
-2. If not installed → downloads the platform-specific package from GitHub Releases → installs to `~/Freerouting-Desktop/`
+2. If not installed → downloads the platform-specific package from GitHub Releases
 3. Launches FreeRouting in API mode with `--gui.enabled=false`
 4. Frontend opens DSN file → sends to FR API via CORS proxy → starts routing
 5. FR pushes progress via SSE → frontend parses SES output → LeaferJS renders PCB board in real-time
