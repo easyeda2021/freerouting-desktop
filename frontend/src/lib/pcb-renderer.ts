@@ -297,6 +297,10 @@ export function createPcbRenderer(container: HTMLElement) {
         drawRatsnest(data, ratsnestGroup, hiddenNets, selectedNet, layerColors, getScale())
       }
 
+      // Keep measurement/crosshair overlays on top of everything
+      app.tree.add(measurementGroup)
+      app.tree.add(crosshairGroup)
+
     } catch (e) {
       console.error('PCB render error:', e)
     }

@@ -201,9 +201,6 @@ export default function BoardCanvas() {
       rendererRef.current?.clearMeasurement()
     }
     rendererRef.current?.drawCrosshair(null)
-    if (containerRef.current) {
-      containerRef.current.style.cursor = state.measurement.active ? 'none' : 'default'
-    }
     if (crosshairRef.current) {
       crosshairRef.current.style.display = state.measurement.active ? 'block' : 'none'
     }
