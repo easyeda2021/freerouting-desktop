@@ -59,10 +59,22 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   function resize() {
-    ;(app as any).resize?.()
+    const rect = container.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+    try {
+      ;(app as any).resize?.()
+    } catch (e) {
+      console.error('PCB resize error:', e)
+    }
     // Wait a frame so the canvas/view bounds reflect the new container size
     requestAnimationFrame(() => {
-      ;(app as any).resize?.()
+      const rect2 = container.getBoundingClientRect()
+      if (!rect2.width || !rect2.height) return
+      try {
+        ;(app as any).resize?.()
+      } catch (e) {
+        console.error('PCB resize error:', e)
+      }
       fitView()
     })
   }

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
+	"unsafe"
 )
 
 func openNativeFileDialog() (string, error) {
@@ -43,59 +45,123 @@ func saveNativeFileDialog(defaultName string) (string, error) {
 	}
 }
 
-// Windows: use PowerShell to show file dialog
+var (
+	comdlg32             = syscall.NewLazyDLL("comdlg32.dll")
+	procGetOpenFileNameW = comdlg32.NewProc("GetOpenFileNameW")
+	procGetSaveFileNameW = comdlg32.NewProc("GetSaveFileNameW")
+)
+
+type openFileName struct {
+	lStructSize       uint32
+	hwndOwner         uintptr
+	hInstance         uintptr
+	lpstrFilter       *uint16
+	lpstrCustomFilter *uint16
+	nMaxCustFilter    uint32
+	nFilterIndex      uint32
+	lpstrFile         *uint16
+	nMaxFile          uint32
+	lpstrFileTitle    *uint16
+	nMaxFileTitle     uint32
+	lpstrInitialDir   *uint16
+	lpstrTitle        *uint16
+	Flags             uint32
+	nFileOffset       uint16
+	nFileExtension    uint16
+	lpstrDefExt       *uint16
+	lCustData         uintptr
+	lpfnHook          uintptr
+	lpTemplateName    *uint16
+	pvReserved        uintptr
+	dwReserved        uint32
+	FlagsEx           uint32
+}
+
+const (
+	ofnFileMustExist    = 0x00001000
+	ofnPathMustExist    = 0x00000800
+	ofnHideReadOnly     = 0x00000004
+	ofnOverwritePrompt  = 0x00000002
+	ofnNoReadOnlyReturn = 0x00008000
+)
+
+func parseFilterWindows(filter string) (*uint16, error) {
+	// Convert "Text (*.txt)|*.txt|All (*.*)|*.*" to Windows double-null-terminated filter
+	parts := strings.Split(filter, "|")
+	if len(parts)%2 != 0 {
+		parts = append(parts, "*.*")
+	}
+	var sb strings.Builder
+	for i := 0; i < len(parts); i += 2 {
+		sb.WriteString(parts[i])
+		sb.WriteByte(0)
+		sb.WriteString(parts[i+1])
+		sb.WriteByte(0)
+	}
+	sb.WriteByte(0)
+	return syscall.UTF16PtrFromString(sb.String())
+}
+
+func showFileDialogWindows(filter, title string, save bool, defaultName string) (string, error) {
+	filterPtr, err := parseFilterWindows(filter)
+	if err != nil {
+		return "", err
+	}
+	titlePtr, err := syscall.UTF16PtrFromString(title)
+	if err != nil {
+		return "", err
+	}
+
+	const maxPath = 4096
+	fileBuf := make([]uint16, maxPath)
+	if save && defaultName != "" {
+		namePtr, err := syscall.UTF16PtrFromString(defaultName)
+		if err == nil {
+			for i := 0; i < maxPath; i++ {
+				v := *(*uint16)(unsafe.Pointer(uintptr(unsafe.Pointer(namePtr)) + uintptr(i)*unsafe.Sizeof(fileBuf[0])))
+				fileBuf[i] = v
+				if v == 0 {
+					break
+				}
+			}
+		}
+	}
+
+	var ofn openFileName
+	ofn.lStructSize = uint32(unsafe.Sizeof(ofn))
+	ofn.lpstrFilter = filterPtr
+	ofn.nFilterIndex = 1
+	ofn.lpstrFile = &fileBuf[0]
+	ofn.nMaxFile = maxPath
+	ofn.lpstrTitle = titlePtr
+	ofn.Flags = ofnFileMustExist | ofnPathMustExist | ofnHideReadOnly
+	if save {
+		ofn.Flags = ofnPathMustExist | ofnOverwritePrompt | ofnNoReadOnlyReturn | ofnHideReadOnly
+	}
+
+	var ret uintptr
+	if save {
+		ret, _, _ = procGetSaveFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
+	} else {
+		ret, _, _ = procGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
+	}
+	if ret == 0 {
+		return "", nil
+	}
+	return syscall.UTF16ToString(fileBuf), nil
+}
+
+// Windows: use native COMDLG32 file dialogs
 func openFileDialogWindows() (string, error) {
-	return fileDialogWindows("DSN Files (*.dsn)|*.dsn|SES Files (*.ses)|*.ses|All Files (*.*)|*.*", "Open Design File")
+	return showFileDialogWindows("DSN Files (*.dsn)|*.dsn|SES Files (*.ses)|*.ses|All Files (*.*)|*.*", "Open Design File", false, "")
 }
 
 func openExecutableDialogWindows() (string, error) {
-	return fileDialogWindows("Executable (*.exe)|*.exe|All Files (*.*)|*.*", "Select FreeRouting Executable")
-}
-
-func fileDialogWindows(filter, title string) (string, error) {
-	script := fmt.Sprintf(`
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-Add-Type -AssemblyName System.Windows.Forms
-$form = New-Object System.Windows.Forms.Form
-$form.TopMost = $true
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Filter = "%s"
-$dialog.Title = "%s"
-if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
-	$dialog.FileName
-}
-$form.Dispose()
-`, filter, title)
-	// DO NOT hide window for file dialogs — PowerShell needs a visible window
-	// to show Windows.Forms dialogs properly
-	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return showFileDialogWindows("Executable (*.exe)|*.exe|All Files (*.*)|*.*", "Select FreeRouting Executable", false, "")
 }
 
 func saveFileDialogWindows(defaultName string) (string, error) {
-	script := fmt.Sprintf(`
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-Add-Type -AssemblyName System.Windows.Forms
-$form = New-Object System.Windows.Forms.Form
-$form.TopMost = $true
-$dialog = New-Object System.Windows.Forms.SaveFileDialog
-$dialog.Filter = "SES Files (*.ses)|*.ses|All Files (*.*)|*.*"
-$dialog.FileName = "%s"
-$dialog.Title = "Save SES File"
-if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
-	$dialog.FileName
-}
-$form.Dispose()
-`, defaultName)
-	// DO NOT hide window for file dialogs
-	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return showFileDialogWindows("SES Files (*.ses)|*.ses|All Files (*.*)|*.*", "Save SES File", true, defaultName)
 }
 
 // macOS: use osascript for file dialogs
