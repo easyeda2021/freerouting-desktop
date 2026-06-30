@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useApp } from '../App'
 import { createPcbRenderer } from '../lib/pcb-renderer'
 import { loadDsnFromContent } from '../lib/dsn-loader'
+import { t } from '../lib/i18n'
 
 export default function BoardCanvas() {
   const { state, dispatch } = useApp()
@@ -316,8 +317,8 @@ export default function BoardCanvas() {
         <div style={{ ...s.emptyOverlay, ...(dragOver ? s.emptyOverlayActive : {}) }}>
           <div style={s.emptyBox}>
             <div style={s.emptyTitle}>FreeRouting Desktop</div>
-            <button style={s.emptyBtn} onClick={handleOpenByDialog}>打开文件</button>
-            <div style={s.emptyHint}>请打开 DSN 文件或拖动 DSN 文件在此处打开</div>
+            <button style={s.emptyBtn} onClick={handleOpenByDialog}>{t('openFile', state.language)}</button>
+            <div style={s.emptyHint}>{t('emptyStateHint', state.language)}</div>
           </div>
         </div>
       )}
@@ -357,7 +358,7 @@ const s: Record<string, React.CSSProperties> = {
   } as React.CSSProperties,
   emptyOverlay: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, transition: 'background 0.15s' },
   emptyOverlayActive: { background: 'rgba(233, 69, 96, 0.08)' },
-  emptyBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, width: 360, height: 240, border: '2px dashed #4a5568', borderRadius: 16, background: 'rgba(15, 52, 96, 0.3)', padding: 32 },
+  emptyBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, width: 480, height: 240, border: '2px dashed #4a5568', borderRadius: 16, background: 'rgba(15, 52, 96, 0.3)', padding: 32 },
   emptyTitle: { color: '#e0e0e0', fontSize: 22, fontWeight: 600, letterSpacing: 1 },
   emptyBtn: { padding: '10px 28px', border: '1px solid #4a5568', borderRadius: 6, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 14, fontWeight: 500 },
   emptyHint: { color: '#888', fontSize: 12, textAlign: 'center', lineHeight: 1.5 },

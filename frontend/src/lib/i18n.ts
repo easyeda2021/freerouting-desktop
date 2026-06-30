@@ -68,6 +68,8 @@ const resources = {
     author: 'Author',
     ok: 'OK',
     help: 'Help',
+    openFile: 'Open File',
+    emptyStateHint: 'Open a DSN file or drag a DSN file here',
   },
   zh: {
     hideLayer: '隐藏层',
@@ -136,6 +138,8 @@ const resources = {
     author: '作者',
     ok: '确定',
     help: '帮助',
+    openFile: '打开文件',
+    emptyStateHint: '请打开 DSN 文件或拖动 DSN 文件在此处打开',
   },
 } as const
 

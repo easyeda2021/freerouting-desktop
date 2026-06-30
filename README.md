@@ -4,6 +4,16 @@ Modern desktop GUI for [FreeRouting](https://github.com/freerouting/freerouting)
 
 Replaces the old Swing GUI with a **Go + WebView** desktop app. The Go host detects whether FreeRouting is installed on the system, downloads and installs it if not, then launches it in API mode. The frontend (React + TypeScript + LeaferJS) renders the PCB board and communicates directly with the FreeRouting HTTP API through a CORS proxy.
 
+Start:
+
+
+
+Routing:
+
+![alt text](images/pixpin_20260630_204026.jpg)
+
+Measure: 
+
 ![FreeRouting Desktop](images/pixpin_20260630_001416.jpg)
 
 ## Download
