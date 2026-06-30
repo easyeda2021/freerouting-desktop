@@ -422,6 +422,16 @@ export default function MenuBar() {
           <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
             {t('exportSes', state.language)}
           </button>
+          <div style={s.divider} />
+          <button
+            style={s.btn}
+            onClick={toggleMeasurement}
+            title={t('measure', state.language)}
+          >
+            {t('measure', state.language)}
+          </button>
+          <button style={s.btn} onClick={handleFitView}>{t('fitView', state.language)}</button>
+          <div style={s.divider} />
           {state.jobState === 'RUNNING' ? (
             <button style={s.btn} onClick={handleStopRouting}>
               {t('stopRouting', state.language)}
@@ -431,14 +441,6 @@ export default function MenuBar() {
               {t('startRoute', state.language)}
             </button>
           )}
-          <button
-            style={s.btn}
-            onClick={toggleMeasurement}
-            title={t('measure', state.language)}
-          >
-            {t('measure', state.language)}
-          </button>
-          <button style={s.btn} onClick={handleFitView}>{t('fitView', state.language)}</button>
         </div>
         <span style={s.fileName}>{state.currentDsn || ''}</span>
         <div style={s.right}>
@@ -458,6 +460,7 @@ const s: Record<string, React.CSSProperties> = {
   fileName: { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', maxWidth: '40%', height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#e0e0e0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   right: { display: 'flex', alignItems: 'center', gap: 8 },
   toggleBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 10px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' },
+  divider: { width: 1, height: 20, background: '#4a5568', margin: '0 4px', flexShrink: 0 },
   dropdownContainer: { position: 'relative', display: 'flex', alignItems: 'stretch' },
   openBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 12px', border: '1px solid #4a5568', borderRadius: '4px 0 0 4px', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
   dropdownToggle: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 28, border: '1px solid #4a5568', borderLeft: 'none', borderRadius: '0 4px 4px 0', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 10, fontWeight: 500 },
