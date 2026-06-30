@@ -48,19 +48,6 @@ export default function MenuBar() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [recentOpen, setRecentOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [appVersion, setAppVersion] = useState('')
-
-  useEffect(() => {
-    const fetchVersion = async () => {
-      try {
-        const v = await window.getAppVersion()
-        setAppVersion(String(v || ''))
-      } catch (err) {
-        console.error('Failed to fetch app version:', err)
-      }
-    }
-    fetchVersion()
-  }, [])
 
   useEffect(() => {
     try {
@@ -449,9 +436,6 @@ export default function MenuBar() {
               <li>{t('featureDrc', state.language)}</li>
             </ul>
             <p style={s.modalRow}>
-              <strong>{t('version', state.language)}:</strong> {appVersion || 'dev'}
-            </p>
-            <p style={s.modalRow}>
               <strong>{t('repository', state.language)}:</strong>{' '}
               <span
                 style={s.modalLink}
@@ -489,10 +473,10 @@ const s: Record<string, React.CSSProperties> = {
   dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-all', lineHeight: '1.4' },
   dropdownEmpty: { padding: '6px 10px', fontSize: 11, color: '#888', fontStyle: 'italic' },
   helpBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0, border: '1px solid #4a5568', borderRadius: '50%', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 14, fontWeight: 'bold' },
-  modalContent: { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', background: '#16213e', borderRadius: 12, padding: '36px 44px', width: 520, maxWidth: '90vw', border: '1px solid #0f3460', boxShadow: '0 16px 50px rgba(0,0,0,0.6)', zIndex: 2000 },
-  modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  modalTitle: { margin: 0, color: '#e94560', fontSize: 22 },
-  modalCloseBtn: { width: 32, height: 32, border: 'none', borderRadius: '50%', background: 'transparent', color: '#888', cursor: 'pointer', fontSize: 22, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  modalContent: { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', background: '#16213e', borderRadius: 12, padding: '44px 48px', width: 520, maxWidth: '90vw', border: '1px solid #0f3460', boxShadow: '0 16px 50px rgba(0,0,0,0.6)', zIndex: 2000 },
+  modalHeader: { position: 'relative', marginBottom: 20 },
+  modalTitle: { margin: 0, color: '#e94560', fontSize: 22, textAlign: 'center' },
+  modalCloseBtn: { position: 'absolute', right: -28, top: -28, width: 32, height: 32, border: 'none', borderRadius: '50%', background: 'transparent', color: '#888', cursor: 'pointer', fontSize: 24, lineHeight: '32px', textAlign: 'center', padding: 0 },
   modalBody: { color: '#ccc', fontSize: 14, lineHeight: 1.7 },
   modalRow: { margin: '10px 0' },
   modalFeatureList: { margin: '12px 0', paddingLeft: 20, color: '#aaa', fontSize: 13, lineHeight: 1.8 },
