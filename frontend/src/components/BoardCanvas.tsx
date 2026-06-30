@@ -191,12 +191,16 @@ export default function BoardCanvas() {
   }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.selectedObject, state.currentDsn, dispatch])
 
   useEffect(() => {
-    if (!state.measurement.active) {
+    const m = state.measurement
+    console.log('[measure effect]', m.active, 'start', m.start, 'end', m.end, 'cursor', m.cursor)
+    if (!m.active) {
       rendererRef.current?.clearMeasurement()
-    } else if (state.measurement.start && state.measurement.end) {
-      rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)
-    } else if (state.measurement.start && state.measurement.cursor) {
-      rendererRef.current?.drawMeasurementPreview(state.measurement.start, state.measurement.cursor)
+    } else if (m.start && m.end) {
+      console.log('[measure effect] draw final')
+      rendererRef.current?.drawMeasurement(m.start, m.end)
+    } else if (m.start && m.cursor) {
+      console.log('[measure effect] draw preview')
+      rendererRef.current?.drawMeasurementPreview(m.start, m.cursor)
     } else {
       rendererRef.current?.clearMeasurement()
     }

@@ -21,6 +21,11 @@ export function createPcbRenderer(container: HTMLElement) {
   const measurementGroup = new Group({})
   const gridGroup = new Group({})
   const crosshairGroup = new Group({})
+  const keepGroups = new Set([gridGroup, measurementGroup, crosshairGroup])
+  // Permanent overlays are added once and preserved across renders
+  app.tree.add(gridGroup)
+  app.tree.add(measurementGroup)
+  app.tree.add(crosshairGroup)
   let ratsnestGroup: Group | null = null
   let lastBounds = { minX: -500, minY: -500, maxX: 500, maxY: 500, maxDim: 1000 }
   let emptyClickHandler: (() => void) | null = null
@@ -35,10 +40,13 @@ export function createPcbRenderer(container: HTMLElement) {
   function clear() {
     layerGroups.forEach((g) => g.clear())
     layerGroups.clear()
-    app.tree.clear()
-    app.tree.add(gridGroup)
-    app.tree.add(measurementGroup)
-    app.tree.add(crosshairGroup)
+    // Remove dynamic content without destroying the permanent overlay groups
+    const children = (app.tree as any).children
+    if (children) {
+      ;[...children].forEach((child: any) => {
+        if (!keepGroups.has(child)) app.tree.remove(child)
+      })
+    }
   }
 
   function resize() {
@@ -382,6 +390,7 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   function drawMeasurement(start: [number, number] | null, end: [number, number] | null) {
+    console.log('[drawMeasurement] called', start, end, 'children before clear:', (measurementGroup as any).children?.length)
     measurementGroup.clear()
     if (!start) return
 
@@ -473,9 +482,11 @@ export function createPcbRenderer(container: HTMLElement) {
     text.y = 0
     textGroup.add(text)
     measurementGroup.add(textGroup)
+    console.log('[drawMeasurement] final children:', (measurementGroup as any).children?.length)
   }
 
   function drawMeasurementPreview(start: [number, number] | null, cursor: [number, number] | null) {
+    console.log('[drawMeasurementPreview] called', start, cursor)
     measurementGroup.clear()
     if (!start || !cursor) return
 
@@ -516,9 +527,11 @@ export function createPcbRenderer(container: HTMLElement) {
         strokeJoin: 'round',
       })
     )
+    console.log('[drawMeasurementPreview] preview children:', (measurementGroup as any).children?.length)
   }
 
   function clearMeasurement() {
+    console.log('[clearMeasurement] called')
     measurementGroup.clear()
   }
 
