@@ -176,8 +176,7 @@ export default function BoardCanvas() {
           },
         })
         if (isNewDsn || !hasFittedRef.current) {
-          // Let Leafer finish layout before fitting
-          requestAnimationFrame(() => rendererRef.current?.fitView())
+          rendererRef.current?.fitView()
           hasFittedRef.current = true
           prevDsnRef.current = state.currentDsn
         }

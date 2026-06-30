@@ -80,6 +80,7 @@ export function createPcbRenderer(container: HTMLElement) {
       tree.x = rect.width / 2 - cx * s
       // Y-axis is flipped; positive canvas Y maps to negative board Y
       tree.y = rect.height / 2 + cy * s
+      updateRatsnestWidth()
     } catch (e) {
       console.error('PCB fit error:', e)
     }
