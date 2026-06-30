@@ -406,7 +406,6 @@ export default function MenuBar() {
                 ) : (
                   recentFiles.map((path) => {
                     const safePath = String(path)
-                    const name = safePath.replace(/\\/g, '/').split('/').pop() || safePath
                     return (
                       <div
                         key={safePath}
@@ -414,7 +413,7 @@ export default function MenuBar() {
                         title={safePath}
                         onClick={() => handleRecentFile(safePath)}
                       >
-                        {name}
+                        {safePath}
                       </div>
                     )
                   })
@@ -467,7 +466,7 @@ const s: Record<string, React.CSSProperties> = {
   dropdownContainer: { position: 'relative', display: 'flex', alignItems: 'stretch' },
   openBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 12px', border: '1px solid #4a5568', borderRadius: '4px 0 0 4px', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
   dropdownToggle: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 28, border: '1px solid #4a5568', borderLeft: 'none', borderRadius: '0 4px 4px 0', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 10, fontWeight: 500 },
-  dropdownMenu: { position: 'absolute', top: '100%', left: 0, marginTop: 4, minWidth: 220, maxWidth: 320, background: '#16213e', border: '1px solid #0f3460', borderRadius: 4, zIndex: 100, maxHeight: 300, overflowY: 'auto' },
-  dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  dropdownMenu: { position: 'absolute', top: '100%', left: 0, marginTop: 4, minWidth: 320, maxWidth: 560, background: '#16213e', border: '1px solid #0f3460', borderRadius: 4, zIndex: 100, maxHeight: 300, overflowY: 'auto' },
+  dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-all', lineHeight: '1.4' },
   dropdownEmpty: { padding: '6px 10px', fontSize: 11, color: '#888', fontStyle: 'italic' },
 }
