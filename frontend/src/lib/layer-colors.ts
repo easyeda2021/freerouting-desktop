@@ -1,20 +1,20 @@
 const DEFAULT_PALETTE = [
-  '#ff3333', // red
-  '#33ff57', // green
-  '#3366ff', // blue
-  '#ffff33', // yellow
-  '#ff33ff', // magenta
-  '#ff9933', // orange
-  '#33ffff', // cyan
-  '#ff3380', // hot pink
-  '#80ff33', // lime
-  '#9933ff', // violet
-  '#33ffcc', // turquoise
-  '#ffcc33', // gold
-  '#ff5733', // coral
-  '#33a8ff', // azure
-  '#c433ff', // electric purple
-  '#33ff8d', // spring green
+  '#ff0000', // pure red
+  '#00ff00', // pure lime
+  '#0000ff', // pure blue
+  '#ffff00', // pure yellow
+  '#00ffff', // pure cyan
+  '#ff00ff', // pure magenta
+  '#ff8000', // orange
+  '#8000ff', // violet
+  '#00ff80', // spring green
+  '#ff0080', // rose
+  '#80ff00', // chartreuse
+  '#0080ff', // azure
+  '#ff4000', // vermilion
+  '#00c0ff', // sky
+  '#c000ff', // electric purple
+  '#40ff00', // bright green
 ]
 
 export function getLayerColor(layerName: string, overrides?: Record<string, string>): string {
