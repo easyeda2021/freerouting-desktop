@@ -55,6 +55,13 @@ const resources = {
     routing: 'Routing',
     optimizing: 'Optimizing',
     fitView: 'Fit View',
+    about: 'About',
+    version: 'Version',
+    description: 'A desktop GUI for the FreeRouting PCB autorouter.',
+    repository: 'Repository',
+    author: 'Author',
+    ok: 'OK',
+    help: 'Help',
   },
   zh: {
     hideLayer: '隐藏层',
@@ -110,6 +117,13 @@ const resources = {
     routing: '布线中',
     optimizing: '优化中',
     fitView: '适应画布',
+    about: '关于',
+    version: '版本',
+    description: 'FreeRouting PCB 自动布线器的桌面 GUI。',
+    repository: '项目仓库',
+    author: '作者',
+    ok: '确定',
+    help: '帮助',
   },
 } as const
 

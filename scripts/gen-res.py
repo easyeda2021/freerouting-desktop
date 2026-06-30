@@ -44,7 +44,7 @@ def main():
 
     # Create winres JSON
     winres = {
-        "RT_GROUP_ICON": {"APP": {"0000": icon_files}},
+        "RT_GROUP_ICON": {"#1": {"0000": icon_files}},
         "RT_VERSION": {
             "#1": {
                 "0000": {

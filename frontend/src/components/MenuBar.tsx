@@ -33,6 +33,7 @@ declare global {
     openURL: (url: string) => void
     openFileDialog: () => Promise<string> | string
     readFile: (path: string) => Promise<string> | string
+    getAppVersion: () => Promise<string> | string
   }
 }
 
@@ -45,6 +46,20 @@ export default function MenuBar() {
   const jobStartedRef = useRef(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [recentOpen, setRecentOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const v = await window.getAppVersion()
+        setAppVersion(String(v || ''))
+      } catch (err) {
+        console.error('Failed to fetch app version:', err)
+      }
+    }
+    fetchVersion()
+  }, [])
 
   useEffect(() => {
     try {
@@ -448,8 +463,38 @@ export default function MenuBar() {
         <div style={s.right}>
           <button style={s.toggleBtn} onClick={toggleUnit}>{state.displayUnit.toUpperCase()}</button>
           <button style={s.toggleBtn} onClick={toggleLanguage}>{state.language === 'zh' ? '中' : 'EN'}</button>
+          <button style={s.helpBtn} onClick={() => setAboutOpen(true)} title={t('help', state.language)}>?</button>
         </div>
       </div>
+
+      {aboutOpen && (
+        <div style={s.modalOverlay} onClick={() => setAboutOpen(false)}>
+          <div style={s.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 style={s.modalTitle}>FreeRouting Desktop</h2>
+            <div style={s.modalBody}>
+              <p style={s.modalRow}>
+                <strong>{t('version', state.language)}:</strong> {appVersion || 'dev'}
+              </p>
+              <p style={s.modalRow}>{t('description', state.language)}</p>
+              <p style={s.modalRow}>
+                <strong>{t('repository', state.language)}:</strong>{' '}
+                <span
+                  style={s.modalLink}
+                  onClick={() => window.openURL('https://github.com/easyeda2021/freerouting-desktop')}
+                >
+                  https://github.com/easyeda2021/freerouting-desktop
+                </span>
+              </p>
+              <p style={s.modalRow}>
+                <strong>{t('author', state.language)}:</strong> easyeda2021
+              </p>
+            </div>
+            <div style={s.modalFooter}>
+              <button style={s.modalOkBtn} onClick={() => setAboutOpen(false)}>{t('ok', state.language)}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -469,4 +514,13 @@ const s: Record<string, React.CSSProperties> = {
   dropdownMenu: { position: 'absolute', top: '100%', left: 0, marginTop: 4, minWidth: 320, maxWidth: 560, background: '#16213e', border: '1px solid #0f3460', borderRadius: 4, zIndex: 100, maxHeight: 300, overflowY: 'auto' },
   dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-all', lineHeight: '1.4' },
   dropdownEmpty: { padding: '6px 10px', fontSize: 11, color: '#888', fontStyle: 'italic' },
+  helpBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 0, border: '1px solid #4a5568', borderRadius: '50%', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 14, fontWeight: 'bold' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 },
+  modalContent: { background: '#16213e', borderRadius: 10, padding: '28px 32px', minWidth: 360, maxWidth: 480, border: '1px solid #0f3460', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' },
+  modalTitle: { margin: '0 0 16px 0', color: '#e94560', fontSize: 18, textAlign: 'center' },
+  modalBody: { color: '#ccc', fontSize: 13, lineHeight: 1.6 },
+  modalRow: { margin: '8px 0' },
+  modalLink: { color: '#5ac8fa', textDecoration: 'underline', cursor: 'pointer', wordBreak: 'break-all' },
+  modalFooter: { display: 'flex', justifyContent: 'center', marginTop: 20 },
+  modalOkBtn: { padding: '6px 24px', border: 'none', borderRadius: 6, background: '#e94560', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
 }
