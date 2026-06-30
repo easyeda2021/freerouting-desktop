@@ -8,11 +8,6 @@ import (
 	"unsafe"
 )
 
-const (
-	swHide = 0
-	swShow = 5
-)
-
 var (
 	user32               = syscall.NewLazyDLL("user32.dll")
 	procFindWindowW      = user32.NewProc("FindWindowW")
@@ -20,11 +15,12 @@ var (
 	procSetWindowPos     = user32.NewProc("SetWindowPos")
 	procMoveWindow       = user32.NewProc("MoveWindow")
 	procGetWindowRect    = user32.NewProc("GetWindowRect")
-	procSendMessageW     = user32.NewProc("SendMessageW")
-	procLoadImageW       = user32.NewProc("LoadImageW")
-	procShowWindow       = user32.NewProc("ShowWindow")
-	kernel32             = syscall.NewLazyDLL("kernel32.dll")
-	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
+	procSendMessageW        = user32.NewProc("SendMessageW")
+	procLoadImageW          = user32.NewProc("LoadImageW")
+	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
+	procBringWindowToTop    = user32.NewProc("BringWindowToTop")
+	kernel32                = syscall.NewLazyDLL("kernel32.dll")
+	procGetModuleHandleW    = kernel32.NewProc("GetModuleHandleW")
 )
 
 // mainHwnd is discovered by centerWindow and reused by native dialogs.
@@ -56,11 +52,9 @@ func prepareWindow(win unsafe.Pointer, width, height int) {
 		return
 	}
 	mainHwnd = hwnd
-	// Hide first to avoid showing the default small window, then size/center/icon/show.
-	procShowWindow.Call(hwnd, uintptr(swHide))
 	setWindowSizeAndCenter(hwnd, width, height)
 	setWindowIcon(hwnd)
-	procShowWindow.Call(hwnd, uintptr(swShow))
+	bringWindowToForeground(hwnd)
 }
 
 func centerWindow(width, height int) {
@@ -76,6 +70,7 @@ func centerWindow(width, height int) {
 			mainHwnd = hwnd
 			setWindowSizeAndCenter(hwnd, width, height)
 			setWindowIcon(hwnd)
+			bringWindowToForeground(hwnd)
 			return
 		}
 	}()
@@ -119,4 +114,9 @@ func setWindowIcon(hwnd uintptr) {
 	}
 	procSendMessageW.Call(hwnd, uintptr(wmSetIcon), uintptr(iconSmall), hIcon)
 	procSendMessageW.Call(hwnd, uintptr(wmSetIcon), uintptr(iconBig), hIcon)
+}
+
+func bringWindowToForeground(hwnd uintptr) {
+	procSetForegroundWindow.Call(hwnd)
+	procBringWindowToTop.Call(hwnd)
 }
