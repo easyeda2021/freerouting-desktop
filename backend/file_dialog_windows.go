@@ -96,7 +96,11 @@ func showFileDialogWindows(filter, title string, save bool, defaultName string) 
 		log.Printf("[dialog] CoInitializeEx result=0x%x", coRet)
 		defer procCoUninitialize.Call()
 
-		path, _ := runFileDialogOnSTA(filter, title, save, defaultName)
+		path, err := runFileDialogOnSTA(filter, title, save, defaultName)
+		if err != nil {
+			log.Printf("[dialog] runFileDialogOnSTA error: %v", err)
+		}
+		log.Printf("[dialog] runFileDialogOnSTA returned path=%q", path)
 		result <- path
 	}()
 	return <-result, nil
@@ -105,12 +109,16 @@ func showFileDialogWindows(filter, title string, save bool, defaultName string) 
 func runFileDialogOnSTA(filter, title string, save bool, defaultName string) (string, error) {
 	filterPtr, err := parseFilterWindows(filter)
 	if err != nil {
+		log.Printf("[dialog] parseFilterWindows failed: %v", err)
 		return "", err
 	}
+	log.Printf("[dialog] filter parsed, ptr=%p", filterPtr)
 	titlePtr, err := syscall.UTF16PtrFromString(title)
 	if err != nil {
+		log.Printf("[dialog] UTF16PtrFromString(title=%q) failed: %v", title, err)
 		return "", err
 	}
+	log.Printf("[dialog] title parsed, ptr=%p", titlePtr)
 
 	const maxPath = 4096
 	fileBuf := make([]uint16, maxPath)
