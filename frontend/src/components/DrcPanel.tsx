@@ -43,7 +43,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     padding: '8px 10px',
   },
-  title: { fontSize: 11, fontWeight: 700, marginBottom: 6, color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  title: { fontSize: 11, fontWeight: 700, margin: '0 0 6px 0', color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   empty: { fontSize: 11, color: '#888', padding: '2px 0' },
   list: { maxHeight: 160, overflowY: 'auto' },
   item: { display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 5px', fontSize: 11, borderBottom: '1px solid #0f3460', cursor: 'pointer' },

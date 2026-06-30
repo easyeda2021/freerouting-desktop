@@ -82,7 +82,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     padding: 10,
   },
-  title: { fontSize: 11, fontWeight: 700, marginBottom: 8, color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  title: { fontSize: 11, fontWeight: 700, margin: '0 0 8px 0', color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', fontSize: 11, borderBottom: '1px solid rgba(143, 163, 191, 0.08)' },
   label: { color: '#b0c0d8', marginRight: 8 },
   input: { width: 64, background: '#0f3460', color: '#e0e0e0', border: '1px solid #1c3a5e', borderRadius: 4, padding: '3px 5px', fontSize: 11, outline: 'none' },

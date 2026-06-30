@@ -102,7 +102,7 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     minHeight: 0,
   },
-  title: { fontSize: 11, fontWeight: 700, marginBottom: 8, color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  title: { fontSize: 11, fontWeight: 700, margin: '0 0 8px 0', color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #1c3a5e', borderRadius: 4, padding: '5px 8px', fontSize: 11, boxSizing: 'border-box', outline: 'none' },
   list: { flex: 1, overflowY: 'auto', marginTop: 8, minHeight: 0 },
   item: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', fontSize: 11, cursor: 'pointer', borderRadius: 4, transition: 'background 0.1s' },

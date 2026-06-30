@@ -118,7 +118,7 @@ const s: Record<string, React.CSSProperties> = {
   title: {
     fontSize: 11,
     fontWeight: 700,
-    marginBottom: 6,
+    margin: '0 0 6px 0',
     color: '#8fa3bf',
     textTransform: 'uppercase' as const,
     letterSpacing: 0.5,
