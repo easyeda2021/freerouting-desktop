@@ -21,6 +21,9 @@ var (
 	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
 )
 
+// mainHwnd is discovered by centerWindow and reused by native dialogs.
+var mainHwnd uintptr
+
 const (
 	wmSetIcon = 0x0080
 	iconSmall = 0
@@ -49,6 +52,7 @@ func centerWindow(width, height int) {
 			if hwnd == 0 {
 				continue
 			}
+			mainHwnd = hwnd
 			setWindowCenter(hwnd, width, height)
 			return
 		}

@@ -138,6 +138,7 @@ func runFileDialogOnSTA(filter, title string, save bool, defaultName string) (st
 
 	var ofn openFileName
 	ofn.lStructSize = uint32(unsafe.Sizeof(ofn))
+	ofn.hwndOwner = mainHwnd
 	ofn.lpstrFilter = filterPtr
 	ofn.nFilterIndex = 1
 	ofn.lpstrFile = &fileBuf[0]

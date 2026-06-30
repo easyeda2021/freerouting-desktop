@@ -185,6 +185,26 @@ export default function BoardCanvas() {
       if (file) handleOpenDroppedFile(file)
     }
 
+    // Global drop target so dragging over the Leafer canvas (or any child)
+    // still opens the file when a DSN is already loaded.
+    const handleGlobalDragOver = (e: DragEvent) => {
+      if (!container.contains(e.target as Node)) return
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      setDragOver(true)
+    }
+    const handleGlobalDragLeave = (e: DragEvent) => {
+      if (!container.contains(e.target as Node)) return
+      setDragOver(false)
+    }
+    const handleGlobalDrop = (e: DragEvent) => {
+      if (!container.contains(e.target as Node)) return
+      e.preventDefault()
+      setDragOver(false)
+      const file = e.dataTransfer?.files?.[0]
+      if (file) handleOpenDroppedFile(file)
+    }
+
     window.addEventListener('resize', handleResize)
     document.addEventListener('fullscreenchange', handleResize)
     resizeObserver.observe(container)
@@ -197,6 +217,9 @@ export default function BoardCanvas() {
     container.addEventListener('dragover', handleDragOver)
     container.addEventListener('dragleave', handleDragLeave)
     container.addEventListener('drop', handleDrop)
+    window.addEventListener('dragover', handleGlobalDragOver)
+    window.addEventListener('dragleave', handleGlobalDragLeave)
+    window.addEventListener('drop', handleGlobalDrop)
 
     return () => {
       window.removeEventListener('resize', handleResize)
@@ -211,6 +234,9 @@ export default function BoardCanvas() {
       container.removeEventListener('dragover', handleDragOver)
       container.removeEventListener('dragleave', handleDragLeave)
       container.removeEventListener('drop', handleDrop)
+      window.removeEventListener('dragover', handleGlobalDragOver)
+      window.removeEventListener('dragleave', handleGlobalDragLeave)
+      window.removeEventListener('drop', handleGlobalDrop)
       rendererRef.current?.destroy()
     }
   }, [handleOpenDroppedFile])
