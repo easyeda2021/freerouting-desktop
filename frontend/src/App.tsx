@@ -175,7 +175,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_DRC_RESULTS':
       return { ...state, drcResults: action.violations }
     case 'SET_RECENT_FILES':
-      return { ...state, recentFiles: action.files }
+      return { ...state, recentFiles: Array.isArray(action.files) ? action.files : [] }
     case 'SET_MEASUREMENT':
       return { ...state, measurement: { ...state.measurement, ...action.measurement } }
     case 'SET_PAN_TARGET':

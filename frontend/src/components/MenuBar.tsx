@@ -30,10 +30,10 @@ declare global {
     startFreeRouting: () => string
     stopFreeRouting: () => void
     openURL: (url: string) => void
-    openFileDialog: () => string
-    readFile: (path: string) => string
-    getRecentFiles: () => string[]
-    addRecentFile: (path: string) => void
+    openFileDialog: () => Promise<string> | string
+    readFile: (path: string) => Promise<string> | string
+    getRecentFiles: () => Promise<string[]> | string[]
+    addRecentFile: (path: string) => Promise<void> | void
   }
 }
 
@@ -47,10 +47,12 @@ export default function MenuBar() {
   const [recentOpen, setRecentOpen] = useState(false)
 
   useEffect(() => {
-    try {
-      const files = window.getRecentFiles ? window.getRecentFiles() : []
-      dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
-    } catch { /* ignore */ }
+    ;(async () => {
+      try {
+        const files = window.getRecentFiles ? await window.getRecentFiles() : []
+        dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
+      } catch { /* ignore */ }
+    })()
   }, [dispatch])
 
   const log = (type: 'Info' | 'Warn' | 'Error', message: string, topic = 'App') => {
@@ -160,8 +162,9 @@ export default function MenuBar() {
     }
     try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
     if (fullPath && window.addRecentFile) {
-      window.addRecentFile(fullPath)
-      dispatch({ type: 'SET_RECENT_FILES', files: window.getRecentFiles() })
+      await window.addRecentFile(fullPath)
+      const files = await window.getRecentFiles()
+      dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
     }
 
     dispatch({ type: 'RESET' })
@@ -260,7 +263,7 @@ export default function MenuBar() {
       fileInputRef.current?.click()
       return
     }
-    const content = window.readFile(path)
+    const content = await window.readFile(path)
     if (!content) {
       log('Error', `Failed to read file: ${path}`)
       return
@@ -275,7 +278,7 @@ export default function MenuBar() {
 
   const handleRecentFile = async (path: string) => {
     setRecentOpen(false)
-    const content = window.readFile(path)
+    const content = await window.readFile(path)
     if (!content) {
       log('Error', `Failed to read file: ${path}`)
       return
@@ -331,6 +334,8 @@ export default function MenuBar() {
     }
   }
 
+  const recentFiles = Array.isArray(state.recentFiles) ? state.recentFiles : []
+
   return (
     <>
       <input
@@ -356,17 +361,18 @@ export default function MenuBar() {
             </button>
             {recentOpen && (
               <div style={s.dropdownMenu}>
-                {state.recentFiles.length === 0 ? (
+                {recentFiles.length === 0 ? (
                   <div style={s.dropdownEmpty}>No recent files</div>
                 ) : (
-                  state.recentFiles.map((path) => {
-                    const name = path.replace(/\\/g, '/').split('/').pop() || path
+                  recentFiles.map((path) => {
+                    const safePath = String(path)
+                    const name = safePath.replace(/\\/g, '/').split('/').pop() || safePath
                     return (
                       <div
-                        key={path}
+                        key={safePath}
                         style={s.dropdownItem}
-                        title={path}
-                        onClick={() => handleRecentFile(path)}
+                        title={safePath}
+                        onClick={() => handleRecentFile(safePath)}
                       >
                         {name}
                       </div>
@@ -385,7 +391,7 @@ export default function MenuBar() {
             </button>
           ) : (
             <button style={s.btn} onClick={handleStartRouting} disabled={!state.jobId}>
-              Route
+              Start Route
             </button>
           )}
           <button
