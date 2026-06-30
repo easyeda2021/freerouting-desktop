@@ -1,4 +1,4 @@
-import { App, Line, Ellipse, Group, Rect, Polygon } from 'leafer-ui'
+import { App, Line, Ellipse, Group, Rect, Polygon, Text } from 'leafer-ui'
 import '@leafer-in/view'
 import type { BoardData, ShapeData, TraceData, ViaData, ComponentData, SelectedObject } from './board-types'
 
@@ -18,13 +18,17 @@ export function createPcbRenderer(container: HTMLElement) {
 
   const layerGroups = new Map<string, Group>()
   const measurementGroup = new Group({})
-  let lastBounds = { maxDim: 1000 }
+  const gridGroup = new Group({})
+  const crosshairGroup = new Group({})
+  let lastBounds = { minX: -500, minY: -500, maxX: 500, maxY: 500, maxDim: 1000 }
 
   function clear() {
     layerGroups.forEach((g) => g.clear())
     layerGroups.clear()
     app.tree.clear()
+    app.tree.add(gridGroup)
     app.tree.add(measurementGroup)
+    app.tree.add(crosshairGroup)
   }
 
   function resize() {
@@ -61,6 +65,7 @@ export function createPcbRenderer(container: HTMLElement) {
   ) {
     try {
       clear()
+      drawGrid()
 
       const bounds = computeBounds(data)
       lastBounds = bounds
@@ -256,6 +261,46 @@ export function createPcbRenderer(container: HTMLElement) {
     app.destroy()
   }
 
+  function drawGrid() {
+    gridGroup.clear()
+    const { minX, minY, maxX, maxY, maxDim } = lastBounds
+    if (maxDim <= 0) return
+
+    // Choose a power-of-ten spacing that gives roughly 10-20 divisions
+    const raw = maxDim / 15
+    const exp = Math.floor(Math.log10(Math.max(raw, 1)))
+    const spacing = Math.pow(10, exp)
+
+    const startX = Math.floor(minX / spacing) * spacing
+    const endX = Math.ceil(maxX / spacing) * spacing
+    const startY = Math.floor(minY / spacing) * spacing
+    const endY = Math.ceil(maxY / spacing) * spacing
+
+    const lineWidth = Math.max(maxDim * 0.0002, 0.2)
+    const originWidth = Math.max(maxDim * 0.0008, 0.8)
+
+    for (let x = startX; x <= endX + spacing * 0.5; x += spacing) {
+      const isOrigin = Math.abs(x) < spacing * 0.001
+      gridGroup.add(
+        new Line({
+          points: [x, minY, x, maxY],
+          strokeWidth: isOrigin ? originWidth : lineWidth,
+          stroke: isOrigin ? '#4a5568' : '#1a2338',
+        })
+      )
+    }
+    for (let y = startY; y <= endY + spacing * 0.5; y += spacing) {
+      const isOrigin = Math.abs(y) < spacing * 0.001
+      gridGroup.add(
+        new Line({
+          points: [minX, y, maxX, y],
+          strokeWidth: isOrigin ? originWidth : lineWidth,
+          stroke: isOrigin ? '#4a5568' : '#1a2338',
+        })
+      )
+    }
+  }
+
   function screenToBoard(sx: number, sy: number): [number, number] {
     const rect = container.getBoundingClientRect()
     const tree = app.tree as any
@@ -276,48 +321,150 @@ export function createPcbRenderer(container: HTMLElement) {
     tree.y = rect.height / 2 - y * (tree.scaleY || 1)
   }
 
+  function formatLength(units: number): { mm: string; mil: string } {
+    // Default DSN resolution: 1 unit = 0.1 um if denominator is 10
+    const um = units / 10
+    const mm = um / 1000
+    const mil = um / 25.4
+    return {
+      mm: mm >= 1 ? `${mm.toFixed(2)} mm` : `${mm.toFixed(3)} mm`,
+      mil: mil >= 1 ? `${mil.toFixed(2)} mil` : `${mil.toFixed(3)} mil`,
+    }
+  }
+
   function drawMeasurement(start: [number, number] | null, end: [number, number] | null) {
     measurementGroup.clear()
     if (!start) return
-    const r = Math.max(lastBounds.maxDim * 0.003, 2)
+
+    const r = Math.max(lastBounds.maxDim * 0.004, 3)
     const lineWidth = Math.max(lastBounds.maxDim * 0.0015, 0.5)
+    const color = '#f5a623'
+
     measurementGroup.add(
       new Ellipse({
         x: start[0] - r,
         y: start[1] - r,
         width: r * 2,
         height: r * 2,
-        fill: '#f5a623',
+        fill: color,
         stroke: '#ffffff',
-        strokeWidth: Math.max(r * 0.1, 0.5),
+        strokeWidth: Math.max(r * 0.08, 0.5),
       })
     )
-    if (end) {
-      measurementGroup.add(
-        new Ellipse({
-          x: end[0] - r,
-          y: end[1] - r,
-          width: r * 2,
-          height: r * 2,
-          fill: '#f5a623',
-          stroke: '#ffffff',
-          strokeWidth: Math.max(r * 0.1, 0.5),
-        })
-      )
-      measurementGroup.add(
-        new Line({
-          points: [start[0], start[1], end[0], end[1]],
-          strokeWidth: lineWidth,
-          stroke: '#f5a623',
-          strokeCap: 'round',
-          strokeJoin: 'round',
-        })
-      )
-    }
+
+    if (!end) return
+
+    measurementGroup.add(
+      new Ellipse({
+        x: end[0] - r,
+        y: end[1] - r,
+        width: r * 2,
+        height: r * 2,
+        fill: color,
+        stroke: '#ffffff',
+        strokeWidth: Math.max(r * 0.08, 0.5),
+      })
+    )
+
+    measurementGroup.add(
+      new Line({
+        points: [start[0], start[1], end[0], end[1]],
+        strokeWidth: lineWidth,
+        stroke: color,
+        strokeCap: 'round',
+        strokeJoin: 'round',
+      })
+    )
+
+    const dx = end[0] - start[0]
+    const dy = end[1] - start[1]
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (dist <= 0) return
+
+    const angle = Math.atan2(dy, dx)
+    const midX = (start[0] + end[0]) / 2
+    const midY = (start[1] + end[1]) / 2
+
+    // Perpendicular offset for dimension line
+    const offset = Math.max(lastBounds.maxDim * 0.015, 20)
+    const ox = -Math.sin(angle) * offset
+    const oy = Math.cos(angle) * offset
+
+    const dimStart = [start[0] + ox, start[1] + oy] as [number, number]
+    const dimEnd = [end[0] + ox, end[1] + oy] as [number, number]
+
+    measurementGroup.add(
+      new Line({
+        points: [dimStart[0], dimStart[1], dimEnd[0], dimEnd[1]],
+        strokeWidth: lineWidth,
+        stroke: color,
+      })
+    )
+
+    // Tick marks at endpoints of dimension line
+    measurementGroup.add(new Line({ points: [start[0], start[1], start[0] + ox * 0.6, start[1] + oy * 0.6], strokeWidth: lineWidth, stroke: color }))
+    measurementGroup.add(new Line({ points: [end[0], end[1], end[0] + ox * 0.6, end[1] + oy * 0.6], strokeWidth: lineWidth, stroke: color }))
+
+    // Label background
+    const label = formatLength(dist)
+    const labelText = `${label.mm} / ${label.mil}`
+    const fontSize = Math.max(lastBounds.maxDim * 0.012, 12)
+    const text = new Text({
+      text: labelText,
+      x: midX + ox,
+      y: midY + oy,
+      fill: '#ffffff',
+      fontSize,
+      fontWeight: 'bold',
+      textAlign: 'center',
+    })
+    // Counteract tree Y-flip so text reads upright
+    const textGroup = new Group({ x: midX + ox, y: midY + oy, scaleY: -1 })
+    text.x = 0
+    text.y = 0
+    textGroup.add(text)
+    measurementGroup.add(textGroup)
   }
 
   function clearMeasurement() {
     measurementGroup.clear()
+  }
+
+  function drawCrosshair(pos: [number, number] | null) {
+    crosshairGroup.clear()
+    if (!pos) return
+    const tree = app.tree as any
+    const sx = tree.scaleX || 1
+    const sy = tree.scaleY || 1
+    const tx = tree.x || 0
+    const ty = tree.y || 0
+    const rect = container.getBoundingClientRect()
+
+    // Draw in screen space: counteract tree scale so lines stay 1px and span the view
+    crosshairGroup.scaleX = 1 / sx
+    crosshairGroup.scaleY = 1 / sy
+
+    const cx = pos[0] * sx
+    const cy = pos[1] * sy
+    const xMin = -tx
+    const xMax = rect.width - tx
+    const yMin = -ty
+    const yMax = rect.height - ty
+
+    crosshairGroup.add(
+      new Line({
+        points: [xMin, cy, xMax, cy],
+        strokeWidth: 1,
+        stroke: '#ffffff',
+      })
+    )
+    crosshairGroup.add(
+      new Line({
+        points: [cx, yMin, cx, yMax],
+        strokeWidth: 1,
+        stroke: '#ffffff',
+      })
+    )
   }
 
   function getScale() {
@@ -353,7 +500,7 @@ export function createPcbRenderer(container: HTMLElement) {
     tree.y = (tree.y || 0) + dy
   }
 
-  return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement }
+  return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement, drawCrosshair }
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string) {

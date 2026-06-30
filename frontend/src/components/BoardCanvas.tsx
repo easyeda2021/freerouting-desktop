@@ -37,6 +37,10 @@ export default function BoardCanvas() {
       e.preventDefault()
       const rect = container.getBoundingClientRect()
       rendererRef.current?.zoomBy(e.deltaY, e.clientX - rect.left, e.clientY - rect.top)
+      if (measurementRef.current.active) {
+        const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
+        if (pos) rendererRef.current?.drawCrosshair(pos)
+      }
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,18 +61,24 @@ export default function BoardCanvas() {
 
     const handleMouseDown = (e: MouseEvent) => {
       container.focus()
-      if (measurementRef.current.active && e.button === 0) {
-        e.preventDefault()
-        const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
-        if (!pos) return
-        if (!measurementRef.current.start) {
-          dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
-        } else if (!measurementRef.current.end) {
-          dispatch({ type: 'SET_MEASUREMENT', measurement: { end: pos } })
-        } else {
-          dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
+      if (measurementRef.current.active) {
+        if (e.button === 2) {
+          e.preventDefault()
+          dispatch({ type: 'SET_MEASUREMENT', measurement: { active: false, start: null, end: null, cursor: null } })
+          return
         }
-        return
+        if (e.button === 0) {
+          e.preventDefault()
+          const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
+          if (!pos) return
+          if (!measurementRef.current.start || measurementRef.current.end) {
+            // Start a new measurement, replacing any previous result
+            dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
+          } else {
+            dispatch({ type: 'SET_MEASUREMENT', measurement: { end: pos } })
+          }
+          return
+        }
       }
       if (e.button === 0 || e.button === 2) {
         isDragging.current = true
@@ -81,12 +91,18 @@ export default function BoardCanvas() {
       const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
       if (pos) {
         dispatch({ type: 'SET_MEASUREMENT', measurement: { cursor: pos } })
+        if (measurementRef.current.active) {
+          rendererRef.current?.drawCrosshair(pos)
+        }
       }
       if (!isDragging.current || !lastPos.current) return
       const dx = e.clientX - lastPos.current.x
       const dy = e.clientY - lastPos.current.y
       lastPos.current = { x: e.clientX, y: e.clientY }
       rendererRef.current?.panBy(dx, dy)
+      if (measurementRef.current.active && pos) {
+        rendererRef.current?.drawCrosshair(pos)
+      }
     }
 
     const handleMouseUp = () => {
@@ -151,6 +167,14 @@ export default function BoardCanvas() {
 
   useEffect(() => {
     rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)
+    if (!state.measurement.active) {
+      rendererRef.current?.drawCrosshair(null)
+    } else if (state.measurement.cursor) {
+      rendererRef.current?.drawCrosshair(state.measurement.cursor)
+    }
+    if (containerRef.current) {
+      containerRef.current.style.cursor = state.measurement.active ? 'none' : 'default'
+    }
   }, [state.measurement, state.boardData])
 
   useEffect(() => {

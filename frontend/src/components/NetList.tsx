@@ -80,12 +80,12 @@ export default function NetList() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  panel: { marginTop: 16 },
-  title: { fontSize: 12, fontWeight: 600, marginBottom: 8, color: '#aaa', textTransform: 'uppercase' as const },
-  filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #4a5568', borderRadius: 3, padding: '4px 6px', fontSize: 11, boxSizing: 'border-box' },
-  list: { maxHeight: 220, overflowY: 'auto', marginTop: 6 },
-  item: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', fontSize: 11, cursor: 'pointer', borderRadius: 3 },
+  panel: {},
+  title: { fontSize: 11, fontWeight: 700, marginBottom: 8, color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #1c3a5e', borderRadius: 4, padding: '5px 8px', fontSize: 11, boxSizing: 'border-box', outline: 'none' },
+  list: { maxHeight: 220, overflowY: 'auto', marginTop: 8 },
+  item: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', fontSize: 11, cursor: 'pointer', borderRadius: 4, transition: 'background 0.1s' },
   selected: { background: '#0f3460' },
-  name: { flex: 1, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  count: { color: '#888', fontSize: 10 },
+  name: { flex: 1, color: '#c8d4e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  count: { color: '#7e8fa8', fontSize: 10, fontVariantNumeric: 'tabular-nums' },
 }

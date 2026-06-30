@@ -67,6 +67,7 @@ func initialDirScriptWindows() string {
 
 func fileDialogWindows(filter, title string) (string, error) {
 	script := fmt.Sprintf(`
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form
 $form.TopMost = $true
@@ -90,6 +91,7 @@ $form.Dispose()
 
 func saveFileDialogWindows(defaultName string) (string, error) {
 	script := fmt.Sprintf(`
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form
 $form.TopMost = $true

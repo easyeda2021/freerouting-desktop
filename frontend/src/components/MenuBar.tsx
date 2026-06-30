@@ -395,14 +395,11 @@ export default function MenuBar() {
             </button>
           )}
           <button
-            style={{
-              ...s.btn,
-              ...(state.measurement.active ? s.activeBtn : {}),
-            }}
+            style={s.btn}
             onClick={toggleMeasurement}
-            title="Measure distance (click two points on the canvas)"
+            title="Measure distance (click two points on the canvas, right-click to exit)"
           >
-            {state.measurement.active ? 'Measuring...' : 'Measure'}
+            Measure
           </button>
         </div>
         <span style={s.fileName}>{state.currentDsn || ''}</span>

@@ -4,6 +4,7 @@ import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
 import ErrorBoundary from './components/ErrorBoundary'
 import SidePanel from './components/SidePanel'
+import LeftPanel from './components/LeftPanel'
 import ProgressPanel from './components/ProgressPanel'
 import LogPanel from './components/LogPanel'
 import StatusBar from './components/StatusBar'
@@ -289,6 +290,7 @@ export default function App() {
         <MenuBar />
         <ErrorBoundary>
           <div style={styles.main}>
+            <LeftPanel />
             <div style={styles.canvasArea}>
               <BoardCanvas />
               <ProgressPanel />

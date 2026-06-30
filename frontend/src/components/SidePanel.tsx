@@ -1,6 +1,4 @@
 import { useApp } from '../App'
-import RoutingSettings from './RoutingSettings'
-import NetList from './NetList'
 import DrcPanel from './DrcPanel'
 
 export default function SidePanel() {
@@ -9,28 +7,41 @@ export default function SidePanel() {
 
   return (
     <div style={s.panel}>
-      <h3 style={s.title}>Layers</h3>
-      {boardData?.layers.map((l) => (
-        <label key={l.name} style={s.layer}>
-          <input
-            type="checkbox"
-            checked={layerVisibility[l.name] ?? true}
-            onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: l.name })}
-          />
-          <span style={{ color: getLayerColor(l.index) }}>●</span>
-          {l.name}
-        </label>
-      ))}
+      <div style={s.section}>
+        <h3 style={s.title}>Layers</h3>
+        <div style={s.layerList}>
+          {boardData?.layers.map((l) => (
+            <label key={l.name} style={s.layer}>
+              <input
+                type="checkbox"
+                checked={layerVisibility[l.name] ?? true}
+                onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: l.name })}
+              />
+              <span style={{ color: getLayerColor(l.index) }}>●</span>
+              <span>{l.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       {boardData && (
-        <div style={s.stats}>
+        <div style={s.section}>
           <h3 style={s.title}>Stats</h3>
-          <p style={s.stat}>Traces: {boardData.traces.length}</p>
-          <p style={s.stat}>Vias: {boardData.vias.length}</p>
-          <p style={s.stat}>Components: {boardData.components.length}</p>
+          <div style={s.statRow}>
+            <span style={s.statLabel}>Traces</span>
+            <span style={s.statValue}>{boardData.traces.length}</span>
+          </div>
+          <div style={s.statRow}>
+            <span style={s.statLabel}>Vias</span>
+            <span style={s.statValue}>{boardData.vias.length}</span>
+          </div>
+          <div style={s.statRow}>
+            <span style={s.statLabel}>Components</span>
+            <span style={s.statValue}>{boardData.components.length}</span>
+          </div>
         </div>
       )}
-      <RoutingSettings />
-      <NetList />
+
       <DrcPanel />
       <SelectionInfo />
     </div>
@@ -44,17 +55,20 @@ function SelectionInfo() {
   if (!selectedNet && !selectedObject) return null
 
   return (
-    <div style={s.panel}>
+    <div style={s.section}>
       <h3 style={s.title}>Selection</h3>
-      {selectedNet && <p style={s.stat}>Net: {selectedNet}</p>}
+      {selectedNet && <div style={s.statRow}><span style={s.statLabel}>Net</span><span style={s.statValue}>{selectedNet}</span></div>}
       {selectedObject && (
-        <div style={s.stat}>
-          <p style={s.stat}>Type: {selectedObject.type}</p>
-          {selectedObject.refdes && <p style={s.stat}>Refdes: {selectedObject.refdes}</p>}
-          {selectedObject.pinNumber && <p style={s.stat}>Pin: {selectedObject.pinNumber}</p>}
-          {selectedObject.layer && <p style={s.stat}>Layer: {selectedObject.layer}</p>}
-          {selectedObject.netName && <p style={s.stat}>Net: {selectedObject.netName}</p>}
-        </div>
+        <>
+          <div style={s.statRow}>
+            <span style={s.statLabel}>Type</span>
+            <span style={s.statValue}>{selectedObject.type}</span>
+          </div>
+          {selectedObject.refdes && <div style={s.statRow}><span style={s.statLabel}>Refdes</span><span style={s.statValue}>{selectedObject.refdes}</span></div>}
+          {selectedObject.pinNumber && <div style={s.statRow}><span style={s.statLabel}>Pin</span><span style={s.statValue}>{selectedObject.pinNumber}</span></div>}
+          {selectedObject.layer && <div style={s.statRow}><span style={s.statLabel}>Layer</span><span style={s.statValue}>{selectedObject.layer}</span></div>}
+          {selectedObject.netName && <div style={s.statRow}><span style={s.statLabel}>Net</span><span style={s.statValue}>{selectedObject.netName}</span></div>}
+        </>
       )}
     </div>
   )
@@ -73,9 +87,41 @@ const s: Record<string, React.CSSProperties> = {
     borderLeft: '1px solid #0f3460',
     overflowY: 'auto',
     flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
   },
-  title: { fontSize: 12, fontWeight: 600, marginBottom: 8, color: '#aaa', textTransform: 'uppercase' as const },
-  layer: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontSize: 12, cursor: 'pointer' },
-  stats: { marginTop: 20 },
-  stat: { fontSize: 11, padding: '2px 0', color: '#999' },
+  section: {
+    background: '#0f1c36',
+    border: '1px solid #1c3a5e',
+    borderRadius: 6,
+    padding: 10,
+  },
+  title: {
+    fontSize: 11,
+    fontWeight: 700,
+    marginBottom: 8,
+    color: '#8fa3bf',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  layerList: { display: 'flex', flexDirection: 'column', gap: 2 },
+  layer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '4px 6px',
+    fontSize: 12,
+    cursor: 'pointer',
+    borderRadius: 4,
+  },
+  statRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '3px 0',
+    fontSize: 11,
+  },
+  statLabel: { color: '#8fa3bf' },
+  statValue: { color: '#e0e0e0', fontWeight: 500 },
 }
