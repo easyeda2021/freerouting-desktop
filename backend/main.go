@@ -83,7 +83,7 @@ func main() {
 	w.SetTitle("FreeRouting Desktop " + version)
 	winW, winH := initialWindowSize()
 	w.SetSize(winW, winH, webview.HintNone)
-	centerWindow(winW, winH)
+	prepareWindow(w.Window(), winW, winH)
 
 	w.Bind("checkFreeRoutingStatus", checkFreeRoutingStatus)
 	w.Bind("selectFreeRoutingPath", selectFreeRoutingPath)

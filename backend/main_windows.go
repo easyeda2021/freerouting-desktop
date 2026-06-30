@@ -8,6 +8,11 @@ import (
 	"unsafe"
 )
 
+const (
+	swHide = 0
+	swShow = 5
+)
+
 var (
 	user32               = syscall.NewLazyDLL("user32.dll")
 	procFindWindowW      = user32.NewProc("FindWindowW")
@@ -17,6 +22,7 @@ var (
 	procGetWindowRect    = user32.NewProc("GetWindowRect")
 	procSendMessageW     = user32.NewProc("SendMessageW")
 	procLoadImageW       = user32.NewProc("LoadImageW")
+	procShowWindow       = user32.NewProc("ShowWindow")
 	kernel32             = syscall.NewLazyDLL("kernel32.dll")
 	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
 )
@@ -42,6 +48,21 @@ func screenSize() (int, int) {
 	return int(sw), int(sh)
 }
 
+func prepareWindow(win unsafe.Pointer, width, height int) {
+	hwnd := uintptr(win)
+	if hwnd == 0 {
+		// Fallback: find the window asynchronously by title.
+		centerWindow(width, height)
+		return
+	}
+	mainHwnd = hwnd
+	// Hide first to avoid showing the default small window, then size/center/icon/show.
+	procShowWindow.Call(hwnd, uintptr(swHide))
+	setWindowSizeAndCenter(hwnd, width, height)
+	setWindowIcon(hwnd)
+	procShowWindow.Call(hwnd, uintptr(swShow))
+}
+
 func centerWindow(width, height int) {
 	// Find the window by title and center it using Win32 API.
 	// We retry a few times since the window may not be ready immediately.
@@ -53,7 +74,8 @@ func centerWindow(width, height int) {
 				continue
 			}
 			mainHwnd = hwnd
-			setWindowCenter(hwnd, width, height)
+			setWindowSizeAndCenter(hwnd, width, height)
+			setWindowIcon(hwnd)
 			return
 		}
 	}()
@@ -65,7 +87,7 @@ func findWindow(title string) uintptr {
 	return ret
 }
 
-func setWindowCenter(hwnd uintptr, width, height int) {
+func setWindowSizeAndCenter(hwnd uintptr, width, height int) {
 	sw, _, _ := procGetSystemMetrics.Call(0) // SM_CXSCREEN = 0
 	sh, _, _ := procGetSystemMetrics.Call(1) // SM_CYSCREEN = 1
 	x := int(sw)/2 - width/2
@@ -77,7 +99,6 @@ func setWindowCenter(hwnd uintptr, width, height int) {
 		y = 0
 	}
 	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
-	setWindowIcon(hwnd)
 }
 
 func setWindowIcon(hwnd uintptr) {
