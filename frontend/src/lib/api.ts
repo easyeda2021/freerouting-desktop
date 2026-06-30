@@ -51,6 +51,14 @@ export async function startRouting(jobId: string): Promise<void> {
   await request('PUT', `/v1/jobs/${jobId}/start`)
 }
 
+export async function setJobSettings(jobId: string, settings: Record<string, string | number | boolean | undefined>): Promise<void> {
+  await request('POST', `/v1/jobs/${jobId}/settings`, settings)
+}
+
+export async function getDrcResults(jobId: string): Promise<unknown> {
+  return request('GET', `/v1/jobs/${jobId}/drc`)
+}
+
 export async function getJobStatus(jobId: string) {
   return request('GET', `/v1/jobs/${jobId}`)
 }

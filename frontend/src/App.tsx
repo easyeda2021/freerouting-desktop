@@ -1,11 +1,12 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type Dispatch } from 'react'
-import type { BoardData, LogEntry, FRStatusData } from './lib/board-types'
+import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement } from './lib/board-types'
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
 import ErrorBoundary from './components/ErrorBoundary'
 import SidePanel from './components/SidePanel'
 import ProgressPanel from './components/ProgressPanel'
 import LogPanel from './components/LogPanel'
+import StatusBar from './components/StatusBar'
 import SetupWizard from './components/SetupWizard'
 
 function mergeByKey<T>(existing: T[], incoming: T[], key: (item: T) => string): T[] {
@@ -31,6 +32,14 @@ interface AppState {
   score: number
   logEntries: LogEntry[]
   layerVisibility: Record<string, boolean>
+  routingSettings: RoutingSettings
+  nets: NetInfo[]
+  selectedNet: string | null
+  selectedObject: SelectedObject | null
+  drcResults: DrcViolation[]
+  recentFiles: string[]
+  measurement: Measurement
+  panTarget: { x: number; y: number } | null
 }
 
 type Action =
@@ -44,6 +53,16 @@ type Action =
   | { type: 'ADD_LOG'; entry: LogEntry }
   | { type: 'SET_SCORE'; score: number }
   | { type: 'TOGGLE_LAYER'; layer: string }
+  | { type: 'SET_ROUTING_SETTINGS'; settings: RoutingSettings }
+  | { type: 'SET_NETS'; nets: NetInfo[] }
+  | { type: 'TOGGLE_NET_VISIBILITY'; netName: string }
+  | { type: 'SET_NET_PRIORITY'; netName: string; priority: number }
+  | { type: 'SELECT_NET'; netName: string | null }
+  | { type: 'SELECT_OBJECT'; object: SelectedObject | null }
+  | { type: 'SET_DRC_RESULTS'; violations: DrcViolation[] }
+  | { type: 'SET_RECENT_FILES'; files: string[] }
+  | { type: 'SET_MEASUREMENT'; measurement: Partial<Measurement> }
+  | { type: 'SET_PAN_TARGET'; target: { x: number; y: number } | null }
   | { type: 'RESET' }
 
 const initialState: AppState = {
@@ -62,6 +81,14 @@ const initialState: AppState = {
   score: 0,
   logEntries: [],
   layerVisibility: {},
+  routingSettings: {},
+  nets: [],
+  selectedNet: null,
+  selectedObject: null,
+  drcResults: [],
+  recentFiles: [],
+  measurement: { start: null, end: null, cursor: null, active: false },
+  panTarget: null,
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -122,6 +149,32 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, score: action.score }
     case 'TOGGLE_LAYER':
       return { ...state, layerVisibility: { ...state.layerVisibility, [action.layer]: !state.layerVisibility[action.layer] } }
+    case 'SET_ROUTING_SETTINGS':
+      return { ...state, routingSettings: { ...state.routingSettings, ...action.settings } }
+    case 'SET_NETS':
+      return { ...state, nets: action.nets }
+    case 'TOGGLE_NET_VISIBILITY':
+      return {
+        ...state,
+        nets: state.nets.map((n) => n.name === action.netName ? { ...n, visible: !n.visible } : n),
+      }
+    case 'SET_NET_PRIORITY':
+      return {
+        ...state,
+        nets: state.nets.map((n) => n.name === action.netName ? { ...n, priority: action.priority } : n),
+      }
+    case 'SELECT_NET':
+      return { ...state, selectedNet: action.netName }
+    case 'SELECT_OBJECT':
+      return { ...state, selectedObject: action.object }
+    case 'SET_DRC_RESULTS':
+      return { ...state, drcResults: action.violations }
+    case 'SET_RECENT_FILES':
+      return { ...state, recentFiles: action.files }
+    case 'SET_MEASUREMENT':
+      return { ...state, measurement: { ...state.measurement, ...action.measurement } }
+    case 'SET_PAN_TARGET':
+      return { ...state, panTarget: action.target }
     case 'RESET':
       return { ...initialState, frStatus: state.frStatus, frVersion: state.frVersion }
     default:
@@ -235,6 +288,7 @@ export default function App() {
               <BoardCanvas />
               <ProgressPanel />
               <LogPanel />
+              <StatusBar />
             </div>
             <SidePanel />
           </div>

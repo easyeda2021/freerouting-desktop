@@ -1,0 +1,91 @@
+import { useMemo, useState } from 'react'
+import { useApp } from '../App'
+
+export default function NetList() {
+  const { state, dispatch } = useApp()
+  const { boardData, nets, selectedNet } = state
+  const [filter, setFilter] = useState('')
+
+  useMemo(() => {
+    if (!boardData) return
+    const netMap = new Map<string, { traces: number; vias: number }>()
+    for (const t of boardData.traces) {
+      if (!t.netName) continue
+      const cur = netMap.get(t.netName) || { traces: 0, vias: 0 }
+      cur.traces++
+      netMap.set(t.netName, cur)
+    }
+    for (const v of boardData.vias) {
+      if (!v.netName) continue
+      const cur = netMap.get(v.netName) || { traces: 0, vias: 0 }
+      cur.vias++
+      netMap.set(v.netName, cur)
+    }
+    const existing = new Map(nets.map((n) => [n.name, n]))
+    const next: typeof nets = []
+    for (const [name, counts] of netMap) {
+      const prev = existing.get(name)
+      next.push({
+        name,
+        traceCount: counts.traces,
+        viaCount: counts.vias,
+        visible: prev?.visible ?? true,
+        priority: prev?.priority ?? 0,
+      })
+    }
+    next.sort((a, b) => a.name.localeCompare(b.name))
+    if (JSON.stringify(next) !== JSON.stringify(nets)) {
+      dispatch({ type: 'SET_NETS', nets: next })
+    }
+  }, [boardData, dispatch, nets])
+
+  if (!boardData) return null
+
+  const filtered = nets.filter((n) => n.name.toLowerCase().includes(filter.toLowerCase()))
+  const visibleCount = nets.filter((n) => n.visible).length
+
+  return (
+    <div style={s.panel}>
+      <h3 style={s.title}>Nets ({visibleCount}/{nets.length})</h3>
+      <input
+        style={s.filter}
+        placeholder="Filter nets..."
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+      />
+      <div style={s.list}>
+        {filtered.map((net) => (
+          <div
+            key={net.name}
+            style={{
+              ...s.item,
+              ...(selectedNet === net.name ? s.selected : {}),
+              opacity: net.visible ? 1 : 0.4,
+            }}
+            onClick={() => dispatch({ type: 'SELECT_NET', netName: selectedNet === net.name ? null : net.name })}
+          >
+            <input
+              type="checkbox"
+              checked={net.visible}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => dispatch({ type: 'TOGGLE_NET_VISIBILITY', netName: net.name })}
+            />
+            <span style={s.name}>{net.name}</span>
+            <span style={s.count}>T:{net.traceCount} V:{net.viaCount}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const s: Record<string, React.CSSProperties> = {
+  panel: { marginTop: 16 },
+  title: { fontSize: 12, fontWeight: 600, marginBottom: 8, color: '#aaa', textTransform: 'uppercase' as const },
+  filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #4a5568', borderRadius: 3, padding: '4px 6px', fontSize: 11, boxSizing: 'border-box' },
+  list: { maxHeight: 220, overflowY: 'auto', marginTop: 6 },
+  item: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', fontSize: 11, cursor: 'pointer', borderRadius: 3 },
+  selected: { background: '#0f3460' },
+  name: { flex: 1, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  count: { color: '#888', fontSize: 10 },
+}

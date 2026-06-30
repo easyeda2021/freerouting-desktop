@@ -3,13 +3,18 @@ import { useApp } from '../App'
 import { createPcbRenderer } from '../lib/pcb-renderer'
 
 export default function BoardCanvas() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const containerRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<ReturnType<typeof createPcbRenderer> | null>(null)
   const isDragging = useRef(false)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
   const hasFittedRef = useRef(false)
   const prevDsnRef = useRef<string | null>(null)
+  const measurementRef = useRef(state.measurement)
+
+  useEffect(() => {
+    measurementRef.current = state.measurement
+  }, [state.measurement])
 
   useEffect(() => {
     const container = containerRef.current
@@ -35,6 +40,12 @@ export default function BoardCanvas() {
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (measurementRef.current.active) {
+          dispatch({ type: 'SET_MEASUREMENT', measurement: { active: false, start: null, end: null } })
+        }
+        return
+      }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
       e.preventDefault()
       const step = 80 / (rendererRef.current?.getScale() || 1)
@@ -46,6 +57,19 @@ export default function BoardCanvas() {
 
     const handleMouseDown = (e: MouseEvent) => {
       container.focus()
+      if (measurementRef.current.active && e.button === 0) {
+        e.preventDefault()
+        const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
+        if (!pos) return
+        if (!measurementRef.current.start) {
+          dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
+        } else if (!measurementRef.current.end) {
+          dispatch({ type: 'SET_MEASUREMENT', measurement: { end: pos } })
+        } else {
+          dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
+        }
+        return
+      }
       if (e.button === 0 || e.button === 2) {
         isDragging.current = true
         lastPos.current = { x: e.clientX, y: e.clientY }
@@ -54,6 +78,10 @@ export default function BoardCanvas() {
     }
 
     const handleMouseMove = (e: MouseEvent) => {
+      const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
+      if (pos) {
+        dispatch({ type: 'SET_MEASUREMENT', measurement: { cursor: pos } })
+      }
       if (!isDragging.current || !lastPos.current) return
       const dx = e.clientX - lastPos.current.x
       const dy = e.clientY - lastPos.current.y
@@ -97,8 +125,16 @@ export default function BoardCanvas() {
   useEffect(() => {
     if (state.boardData && rendererRef.current) {
       const isNewDsn = prevDsnRef.current !== state.currentDsn
+      const hiddenNets = new Set(state.nets.filter((n) => !n.visible).map((n) => n.name))
       try {
-        rendererRef.current.render(state.boardData, state.layerVisibility)
+        rendererRef.current.render(state.boardData, state.layerVisibility, {
+          hiddenNets,
+          selectedNet: state.selectedNet,
+          onSelectTrace: (trace) => dispatch({ type: 'SELECT_NET', netName: trace.netName || null }),
+          onSelectVia: (via) => dispatch({ type: 'SELECT_NET', netName: via.netName || null }),
+          onSelectComponent: (comp) => dispatch({ type: 'SELECT_OBJECT', object: { type: 'component', id: comp.refdes, refdes: comp.refdes } }),
+          onSelectPad: (pad) => dispatch({ type: 'SELECT_OBJECT', object: pad }),
+        })
         if (isNewDsn || !hasFittedRef.current) {
           rendererRef.current.fitView()
           hasFittedRef.current = true
@@ -111,7 +147,18 @@ export default function BoardCanvas() {
       hasFittedRef.current = false
       prevDsnRef.current = null
     }
-  }, [state.boardData, state.layerVisibility, state.currentDsn])
+  }, [state.boardData, state.layerVisibility, state.nets, state.selectedNet, state.currentDsn, dispatch])
+
+  useEffect(() => {
+    rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)
+  }, [state.measurement, state.boardData])
+
+  useEffect(() => {
+    if (state.panTarget && rendererRef.current) {
+      rendererRef.current.panTo(state.panTarget.x, state.panTarget.y)
+      dispatch({ type: 'SET_PAN_TARGET', target: null })
+    }
+  }, [state.panTarget, dispatch])
 
   return <div ref={containerRef} style={s.canvas} tabIndex={0} />
 }

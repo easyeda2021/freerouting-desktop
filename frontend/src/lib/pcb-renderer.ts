@@ -1,6 +1,6 @@
 import { App, Line, Ellipse, Group, Rect, Polygon } from 'leafer-ui'
 import '@leafer-in/view'
-import type { BoardData, ShapeData } from './board-types'
+import type { BoardData, ShapeData, TraceData, ViaData, ComponentData, SelectedObject } from './board-types'
 
 const LAYER_COLORS = ['#e94560', '#0f3460', '#16c79a', '#f5a623', '#a855f7', '#06b6d4', '#84cc16', '#ec4899']
 const VIA_COLOR = '#a0a0a0'
@@ -17,11 +17,14 @@ export function createPcbRenderer(container: HTMLElement) {
   ;(app.tree as any).scaleY = -1
 
   const layerGroups = new Map<string, Group>()
+  const measurementGroup = new Group({})
+  let lastBounds = { maxDim: 1000 }
 
   function clear() {
     layerGroups.forEach((g) => g.clear())
     layerGroups.clear()
     app.tree.clear()
+    app.tree.add(measurementGroup)
   }
 
   function resize() {
@@ -44,16 +47,31 @@ export function createPcbRenderer(container: HTMLElement) {
     }
   }
 
-  function render(data: BoardData, visibility: Record<string, boolean>) {
+  function render(
+    data: BoardData,
+    visibility: Record<string, boolean>,
+    options: {
+      hiddenNets?: Set<string>
+      selectedNet?: string | null
+      onSelectTrace?: (trace: TraceData) => void
+      onSelectVia?: (via: ViaData) => void
+      onSelectComponent?: (comp: ComponentData) => void
+      onSelectPad?: (pad: SelectedObject) => void
+    } = {}
+  ) {
     try {
       clear()
 
       const bounds = computeBounds(data)
+      lastBounds = bounds
       const outlineWidth = Math.max(bounds.maxDim * 0.002, 1)
+      const hiddenNets = options.hiddenNets || new Set<string>()
+      const selectedNet = options.selectedNet || null
 
       // Group traces by layer
       for (const trace of data.traces) {
         if (visibility[trace.layer] === false) continue
+        if (trace.netName && hiddenNets.has(trace.netName)) continue
         const points = trace.corners.flat()
         if (points.some(Number.isNaN)) continue
         let group = layerGroups.get(trace.layer)
@@ -63,15 +81,18 @@ export function createPcbRenderer(container: HTMLElement) {
           app.tree.add(group)
         }
         const isOutline = trace.netName === ''
-        group.add(
-          new Line({
-            points,
-            strokeWidth: isOutline ? outlineWidth : Math.max(trace.width, 0.5),
-            stroke: isOutline ? '#e0e0e0' : getLayerColor(trace.layer),
-            strokeCap: 'round',
-            strokeJoin: 'round',
-          })
-        )
+        const isSelected = selectedNet !== null && trace.netName === selectedNet
+        const line = new Line({
+          points,
+          strokeWidth: isOutline ? outlineWidth : Math.max(trace.width, 0.5),
+          stroke: isOutline ? '#e0e0e0' : (isSelected ? '#ffffff' : getLayerColor(trace.layer)),
+          strokeCap: 'round',
+          strokeJoin: 'round',
+        })
+        if (options.onSelectTrace) {
+          line.on('pointer.down', () => options.onSelectTrace!(trace))
+        }
+        group.add(line)
       }
 
       // Render vias (fixed color, separate from layer traces/pads)
@@ -79,17 +100,21 @@ export function createPcbRenderer(container: HTMLElement) {
       app.tree.add(viaGroup)
       for (const via of data.vias) {
         if (Number.isNaN(via.center[0]) || Number.isNaN(via.center[1])) continue
-        viaGroup.add(
-          new Ellipse({
-            x: via.center[0] - via.diameter / 2,
-            y: via.center[1] - via.diameter / 2,
-            width: via.diameter,
-            height: via.diameter,
-            fill: VIA_COLOR,
-            stroke: VIA_STROKE,
-            strokeWidth: Math.max(via.diameter * 0.08, 1),
-          })
-        )
+        if (via.netName && hiddenNets.has(via.netName)) continue
+        const isSelected = selectedNet !== null && via.netName === selectedNet
+        const ellipse = new Ellipse({
+          x: via.center[0] - via.diameter / 2,
+          y: via.center[1] - via.diameter / 2,
+          width: via.diameter,
+          height: via.diameter,
+          fill: isSelected ? '#ffffff' : VIA_COLOR,
+          stroke: isSelected ? '#ffffff' : VIA_STROKE,
+          strokeWidth: Math.max(via.diameter * 0.08, 1),
+        })
+        if (options.onSelectVia) {
+          ellipse.on('pointer.down', () => options.onSelectVia!(via))
+        }
+        viaGroup.add(ellipse)
       }
 
       // Determine top/bottom layer names for back-side component flipping
@@ -155,6 +180,9 @@ export function createPcbRenderer(container: HTMLElement) {
             })
           )
         }
+        if (options.onSelectComponent) {
+          marker.on('pointer.down', () => options.onSelectComponent!(comp))
+        }
         compGroup.add(marker)
       }
 
@@ -202,6 +230,17 @@ export function createPcbRenderer(container: HTMLElement) {
               rotation: pin.rotation,
             })
             renderShape(shape, g, color)
+            if (options.onSelectPad) {
+              g.on('pointer.down', () =>
+                options.onSelectPad!({
+                  type: 'pad',
+                  id: `${comp.refdes}-${pin.pinNumber}`,
+                  refdes: comp.refdes,
+                  pinNumber: pin.pinNumber,
+                  layer,
+                })
+              )
+            }
             content.add(g)
           }
         }
@@ -215,6 +254,70 @@ export function createPcbRenderer(container: HTMLElement) {
 
   function destroy() {
     app.destroy()
+  }
+
+  function screenToBoard(sx: number, sy: number): [number, number] {
+    const rect = container.getBoundingClientRect()
+    const tree = app.tree as any
+    const scaleX = tree.scaleX || 1
+    const scaleY = tree.scaleY || 1
+    const tx = tree.x || 0
+    const ty = tree.y || 0
+    return [
+      (sx - rect.left - tx) / scaleX,
+      (sy - rect.top - ty) / scaleY,
+    ]
+  }
+
+  function panTo(x: number, y: number) {
+    const rect = container.getBoundingClientRect()
+    const tree = app.tree as any
+    tree.x = rect.width / 2 - x * (tree.scaleX || 1)
+    tree.y = rect.height / 2 - y * (tree.scaleY || 1)
+  }
+
+  function drawMeasurement(start: [number, number] | null, end: [number, number] | null) {
+    measurementGroup.clear()
+    if (!start) return
+    const r = Math.max(lastBounds.maxDim * 0.003, 2)
+    const lineWidth = Math.max(lastBounds.maxDim * 0.0015, 0.5)
+    measurementGroup.add(
+      new Ellipse({
+        x: start[0] - r,
+        y: start[1] - r,
+        width: r * 2,
+        height: r * 2,
+        fill: '#f5a623',
+        stroke: '#ffffff',
+        strokeWidth: Math.max(r * 0.1, 0.5),
+      })
+    )
+    if (end) {
+      measurementGroup.add(
+        new Ellipse({
+          x: end[0] - r,
+          y: end[1] - r,
+          width: r * 2,
+          height: r * 2,
+          fill: '#f5a623',
+          stroke: '#ffffff',
+          strokeWidth: Math.max(r * 0.1, 0.5),
+        })
+      )
+      measurementGroup.add(
+        new Line({
+          points: [start[0], start[1], end[0], end[1]],
+          strokeWidth: lineWidth,
+          stroke: '#f5a623',
+          strokeCap: 'round',
+          strokeJoin: 'round',
+        })
+      )
+    }
+  }
+
+  function clearMeasurement() {
+    measurementGroup.clear()
   }
 
   function getScale() {
@@ -250,7 +353,7 @@ export function createPcbRenderer(container: HTMLElement) {
     tree.y = (tree.y || 0) + dy
   }
 
-  return { render, destroy, resize, zoomBy, panBy, getScale, fitView }
+  return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement }
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string) {

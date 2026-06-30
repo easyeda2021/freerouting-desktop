@@ -1,9 +1,27 @@
-import { useRef, type ChangeEvent } from 'react'
+import { useRef, useState, useEffect, type ChangeEvent } from 'react'
 import { useApp } from '../App'
-import { createSession, createJob, uploadDsn, startRouting, cancelRouting, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
+import { createSession, createJob, uploadDsn, startRouting, cancelRouting, setJobSettings, getDrcResults, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
-import type { BoardData, LogEntry } from '../lib/board-types'
+import type { BoardData, LogEntry, DrcViolation } from '../lib/board-types'
+
+function parseDrcResponse(data: unknown): DrcViolation[] {
+  if (!data || typeof data !== 'object') return []
+  const violations: DrcViolation[] = []
+  const list = (data as any).violations || (Array.isArray(data) ? data : [])
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    violations.push({
+      type: String(item.type || item.rule || 'violation'),
+      message: String(item.message || item.description || ''),
+      netName: item.net_name ? String(item.net_name) : undefined,
+      layer: item.layer ? String(item.layer) : undefined,
+      x: Number(item.x ?? item.location?.[0] ?? 0),
+      y: Number(item.y ?? item.location?.[1] ?? 0),
+    })
+  }
+  return violations
+}
 
 declare global {
   interface Window {
@@ -14,6 +32,8 @@ declare global {
     openURL: (url: string) => void
     openFileDialog: () => string
     readFile: (path: string) => string
+    getRecentFiles: () => string[]
+    addRecentFile: (path: string) => void
   }
 }
 
@@ -23,6 +43,14 @@ export default function MenuBar() {
   const outputFetchedRef = useRef(false)
   const pendingMergeRef = useRef<BoardData | null>(null)
   const mergeTimerRef = useRef<number | null>(null)
+  const [recentOpen, setRecentOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const files = window.getRecentFiles ? window.getRecentFiles() : []
+      dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
+    } catch { /* ignore */ }
+  }, [dispatch])
 
   const log = (type: 'Info' | 'Warn' | 'Error', message: string, topic = 'App') => {
     dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type, message, topic } })
@@ -97,6 +125,15 @@ export default function MenuBar() {
           }
           await fetchAndMergeOutput('finalOutput')
           log('Info', 'Final routing output merged')
+
+          try {
+            const drc = await getDrcResults(jobId)
+            const violations = parseDrcResponse(drc)
+            dispatch({ type: 'SET_DRC_RESULTS', violations })
+            log('Info', `DRC completed: ${violations.length} violations`)
+          } catch (err) {
+            console.error('DRC check failed:', err)
+          }
         }
         if (status.state === 'COMPLETED' || status.state === 'CANCELLED') {
           clearInterval(poll)
@@ -112,7 +149,7 @@ export default function MenuBar() {
     }, 5000)
   }
 
-  const loadDsnFromContent = async (content: string, fileName: string) => {
+  const loadDsnFromContent = async (content: string, fileName: string, fullPath?: string) => {
     outputFetchedRef.current = false
     pendingMergeRef.current = null
     if (mergeTimerRef.current) {
@@ -120,6 +157,10 @@ export default function MenuBar() {
       mergeTimerRef.current = null
     }
     try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
+    if (fullPath && window.addRecentFile) {
+      window.addRecentFile(fullPath)
+      dispatch({ type: 'SET_RECENT_FILES', files: window.getRecentFiles() })
+    }
 
     dispatch({ type: 'RESET' })
     log('Info', `Loading design: ${fileName}`)
@@ -147,6 +188,12 @@ export default function MenuBar() {
     if (!state.jobId) return
     log('Info', 'Starting autorouting...')
     try {
+      const settings = state.routingSettings
+      const hasSettings = settings && Object.keys(settings).length > 0
+      if (hasSettings) {
+        await setJobSettings(state.jobId, settings)
+        log('Info', `Applied routing settings: ${JSON.stringify(settings)}`)
+      }
       await startRouting(state.jobId)
       log('Info', 'Autorouting started')
       setupRoutingStreams(state.jobId)
@@ -187,10 +234,32 @@ export default function MenuBar() {
     }
     try {
       const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
-      await loadDsnFromContent(content, fileName)
+      await loadDsnFromContent(content, fileName, path)
     } catch (err) {
       log('Error', `Failed to load DSN: ${err}`)
     }
+  }
+
+  const handleRecentFile = async (path: string) => {
+    setRecentOpen(false)
+    const content = window.readFile(path)
+    if (!content) {
+      log('Error', `Failed to read file: ${path}`)
+      return
+    }
+    const fileName = path.replace(/\\/g, '/').split('/').pop() || 'board.dsn'
+    try {
+      await loadDsnFromContent(content, fileName, path)
+    } catch (err) {
+      log('Error', `Failed to load DSN: ${err}`)
+    }
+  }
+
+  const toggleMeasurement = () => {
+    dispatch({
+      type: 'SET_MEASUREMENT',
+      measurement: { active: !state.measurement.active, start: null, end: null },
+    })
   }
 
   const handleFileInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -200,7 +269,7 @@ export default function MenuBar() {
     try {
       const content = await file.text()
       if (!content) return
-      await loadDsnFromContent(content, file.name)
+      await loadDsnFromContent(content, file.name, undefined)
     } catch (err) {
       console.error('Failed to read selected file:', err)
       dispatch({ type: 'ADD_LOG', entry: { timestamp: new Date().toISOString(), type: 'Error', message: String(err), topic: 'App' } })
@@ -240,9 +309,40 @@ export default function MenuBar() {
       />
       <div style={s.bar}>
         <div style={s.left}>
-          <button style={s.btn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
-            Open DSN
-          </button>
+          <div style={s.dropdownContainer}>
+            <button style={s.openBtn} onClick={handleOpenDsn} disabled={state.frStatus !== 'ready'}>
+              Open DSN
+            </button>
+            <button
+              style={s.dropdownToggle}
+              onClick={() => setRecentOpen((v) => !v)}
+              disabled={state.frStatus !== 'ready'}
+              title="Recent files"
+            >
+              ▼
+            </button>
+            {recentOpen && (
+              <div style={s.dropdownMenu}>
+                {state.recentFiles.length === 0 ? (
+                  <div style={s.dropdownEmpty}>No recent files</div>
+                ) : (
+                  state.recentFiles.map((path) => {
+                    const name = path.replace(/\\/g, '/').split('/').pop() || path
+                    return (
+                      <div
+                        key={path}
+                        style={s.dropdownItem}
+                        title={path}
+                        onClick={() => handleRecentFile(path)}
+                      >
+                        {name}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+          </div>
           <button style={s.btn} onClick={handleExportSes} disabled={!state.jobId}>
             Export SES
           </button>
@@ -255,6 +355,16 @@ export default function MenuBar() {
               Route
             </button>
           )}
+          <button
+            style={{
+              ...s.btn,
+              ...(state.measurement.active ? s.activeBtn : {}),
+            }}
+            onClick={toggleMeasurement}
+            title="Measure distance (click two points on the canvas)"
+          >
+            {state.measurement.active ? 'Measuring...' : 'Measure'}
+          </button>
         </div>
         <span style={s.fileName}>{state.currentDsn || ''}</span>
       </div>
@@ -266,5 +376,12 @@ const s: Record<string, React.CSSProperties> = {
   bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
   left: { display: 'flex', alignItems: 'center', gap: 8 },
   btn: { padding: '5px 16px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
+  activeBtn: { background: '#e94560', borderColor: '#e94560' },
   fileName: { fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  dropdownContainer: { position: 'relative', display: 'flex', alignItems: 'stretch' },
+  openBtn: { padding: '5px 12px', border: '1px solid #4a5568', borderRadius: '4px 0 0 4px', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
+  dropdownToggle: { padding: '5px 6px', border: '1px solid #4a5568', borderLeft: 'none', borderRadius: '0 4px 4px 0', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 10, fontWeight: 500 },
+  dropdownMenu: { position: 'absolute', top: '100%', left: 0, marginTop: 4, minWidth: 220, maxWidth: 320, background: '#16213e', border: '1px solid #0f3460', borderRadius: 4, zIndex: 100, maxHeight: 300, overflowY: 'auto' },
+  dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  dropdownEmpty: { padding: '6px 10px', fontSize: 11, color: '#888', fontStyle: 'italic' },
 }

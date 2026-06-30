@@ -1,4 +1,7 @@
 import { useApp } from '../App'
+import RoutingSettings from './RoutingSettings'
+import NetList from './NetList'
+import DrcPanel from './DrcPanel'
 
 export default function SidePanel() {
   const { state, dispatch } = useApp()
@@ -24,6 +27,33 @@ export default function SidePanel() {
           <p style={s.stat}>Traces: {boardData.traces.length}</p>
           <p style={s.stat}>Vias: {boardData.vias.length}</p>
           <p style={s.stat}>Components: {boardData.components.length}</p>
+        </div>
+      )}
+      <RoutingSettings />
+      <NetList />
+      <DrcPanel />
+      <SelectionInfo />
+    </div>
+  )
+}
+
+function SelectionInfo() {
+  const { state } = useApp()
+  const { selectedNet, selectedObject } = state
+
+  if (!selectedNet && !selectedObject) return null
+
+  return (
+    <div style={s.panel}>
+      <h3 style={s.title}>Selection</h3>
+      {selectedNet && <p style={s.stat}>Net: {selectedNet}</p>}
+      {selectedObject && (
+        <div style={s.stat}>
+          <p style={s.stat}>Type: {selectedObject.type}</p>
+          {selectedObject.refdes && <p style={s.stat}>Refdes: {selectedObject.refdes}</p>}
+          {selectedObject.pinNumber && <p style={s.stat}>Pin: {selectedObject.pinNumber}</p>}
+          {selectedObject.layer && <p style={s.stat}>Layer: {selectedObject.layer}</p>}
+          {selectedObject.netName && <p style={s.stat}>Net: {selectedObject.netName}</p>}
         </div>
       )}
     </div>

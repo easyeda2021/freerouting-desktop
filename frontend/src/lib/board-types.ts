@@ -86,3 +86,49 @@ export interface JobStatus {
   stage: string
   currentPass: number
 }
+
+export interface RoutingSettings {
+  [key: string]: string | number | boolean | undefined
+  max_passes?: number
+  via_costs?: number
+  plane_via_costs?: number
+  start_ripup_costs?: number
+  improvement_threshold?: number
+  default_preferred_direction_trace_cost?: number
+  default_undesired_direction_trace_cost?: number
+  fanout_enabled?: boolean
+  optimizer_enabled?: boolean
+}
+
+export interface NetInfo {
+  name: string
+  traceCount: number
+  viaCount: number
+  visible: boolean
+  priority: number
+}
+
+export interface DrcViolation {
+  type: string
+  message: string
+  netName?: string
+  layer?: string
+  x: number
+  y: number
+}
+
+export interface SelectedObject {
+  type: 'trace' | 'via' | 'component' | 'pad'
+  id: string
+  netName?: string
+  refdes?: string
+  pinNumber?: string
+  layer?: string
+}
+
+export interface Measurement {
+  start: [number, number] | null
+  end: [number, number] | null
+  cursor: [number, number] | null
+  active: boolean
+}
