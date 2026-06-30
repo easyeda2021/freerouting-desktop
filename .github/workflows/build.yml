@@ -24,11 +24,6 @@ jobs:
             target: windows
             make-target: ci-windows
             artifact-suffix: windows-x64.exe
-          - name: macos-x64
-            os: macos-13
-            target: macos
-            make-target: macos
-            artifact-suffix: macos-x64
           - name: macos-arm64
             os: macos-14
             target: macos-arm
