@@ -1,18 +1,19 @@
 import { useApp } from '../App'
+import { t } from '../lib/i18n'
 
 export default function ProgressPanel() {
   const { state } = useApp()
-  const { jobState, jobStage, currentPass, score } = state
+  const { jobState, jobStage, currentPass, score, language } = state
 
   const progress = jobState === 'COMPLETED' ? 100 : jobState === 'RUNNING' ? Math.min(currentPass * 2, 95) : 0
 
   return (
     <div style={s.panel}>
       <div style={s.row}>
-        <span>State: {jobState || 'Idle'}</span>
-        {jobStage && <span>Stage: {jobStage}</span>}
-        {currentPass > 0 && <span>Pass: {currentPass}</span>}
-        {score > 0 && <span>Score: {score.toFixed(2)}</span>}
+        <span>{t('state', language)}: {jobState ? t(jobState.toLowerCase(), language) || jobState : t('idle', language)}</span>
+        {jobStage && <span>{t('stage', language)}: {t(jobStage.toLowerCase(), language) || jobStage}</span>}
+        {currentPass > 0 && <span>{t('pass', language)}: {currentPass}</span>}
+        {score > 0 && <span>{t('score', language)}: {score.toFixed(2)}</span>}
       </div>
       <div style={s.bar}>
         <div style={{ ...s.fill, width: `${progress}%` }} />

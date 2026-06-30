@@ -160,7 +160,8 @@ export default function BoardCanvas() {
           onSelectPad: (pad) => dispatch({ type: 'SELECT_OBJECT', object: pad }),
         })
         if (isNewDsn || !hasFittedRef.current) {
-          rendererRef.current.fitView()
+          // Let Leafer finish layout before fitting
+          requestAnimationFrame(() => rendererRef.current?.fitView())
           hasFittedRef.current = true
           prevDsnRef.current = state.currentDsn
         }
@@ -190,6 +191,10 @@ export default function BoardCanvas() {
       dispatch({ type: 'SET_PAN_TARGET', target: null })
     }
   }, [state.panTarget, dispatch])
+
+  useEffect(() => {
+    rendererRef.current?.fitView()
+  }, [state.fitViewTrigger])
 
   return (
     <div ref={containerRef} style={s.canvas} tabIndex={0}>

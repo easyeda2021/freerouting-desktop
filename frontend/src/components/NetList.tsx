@@ -67,7 +67,11 @@ export default function NetList() {
                 ...(selectedNet === net.name ? s.selected : {}),
                 opacity: net.visible ? 1 : 0.4,
               }}
-              onClick={() => dispatch({ type: 'SELECT_NET', netName: selectedNet === net.name ? null : net.name })}
+              onClick={() => {
+                const next = selectedNet === net.name ? null : net.name
+                dispatch({ type: 'SELECT_NET', netName: next })
+                dispatch({ type: 'SELECT_OBJECT', object: null })
+              }}
             >
               <input
                 type="checkbox"

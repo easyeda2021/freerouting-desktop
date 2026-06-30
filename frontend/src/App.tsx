@@ -43,6 +43,7 @@ interface AppState {
   recentFiles: string[]
   measurement: Measurement
   panTarget: { x: number; y: number } | null
+  fitViewTrigger: number
   displayUnit: DisplayUnit
   language: Lang
 }
@@ -70,6 +71,7 @@ type Action =
   | { type: 'SET_RECENT_FILES'; files: string[] }
   | { type: 'SET_MEASUREMENT'; measurement: Partial<Measurement> }
   | { type: 'SET_PAN_TARGET'; target: { x: number; y: number } | null }
+  | { type: 'TRIGGER_FIT_VIEW' }
   | { type: 'SET_DISPLAY_UNIT'; unit: DisplayUnit }
   | { type: 'SET_LANGUAGE'; lang: Lang }
   | { type: 'RESET' }
@@ -100,6 +102,7 @@ const initialState: AppState = {
   recentFiles: [],
   measurement: { start: null, end: null, cursor: null, active: false },
   panTarget: null,
+  fitViewTrigger: 0,
   displayUnit: 'mm',
   language: 'zh',
 }
@@ -195,6 +198,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, measurement: { ...state.measurement, ...action.measurement } }
     case 'SET_PAN_TARGET':
       return { ...state, panTarget: action.target }
+    case 'TRIGGER_FIT_VIEW':
+      return { ...state, fitViewTrigger: state.fitViewTrigger + 1 }
     case 'SET_DISPLAY_UNIT':
       return { ...state, displayUnit: action.unit }
     case 'SET_LANGUAGE':

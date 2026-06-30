@@ -323,6 +323,10 @@ export default function MenuBar() {
     dispatch({ type: 'SET_LANGUAGE', lang: state.language === 'zh' ? 'en' : 'zh' })
   }
 
+  const handleFitView = () => {
+    dispatch({ type: 'TRIGGER_FIT_VIEW' })
+  }
+
   const handleFileInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -426,11 +430,12 @@ export default function MenuBar() {
           >
             {t('measure', state.language)}
           </button>
+          <button style={s.btn} onClick={handleFitView}>{t('fitView', state.language)}</button>
         </div>
+        <span style={s.fileName}>{state.currentDsn || ''}</span>
         <div style={s.right}>
           <button style={s.toggleBtn} onClick={toggleUnit}>{state.displayUnit.toUpperCase()}</button>
           <button style={s.toggleBtn} onClick={toggleLanguage}>{state.language === 'zh' ? '中' : 'EN'}</button>
-          <span style={s.fileName}>{state.currentDsn || ''}</span>
         </div>
       </div>
     </>
@@ -438,11 +443,11 @@ export default function MenuBar() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
+  bar: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
   left: { display: 'flex', alignItems: 'center', gap: 8 },
   btn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 16px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
   activeBtn: { background: '#e94560', borderColor: '#e94560' },
-  fileName: { display: 'flex', alignItems: 'center', height: 28, fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  fileName: { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', maxWidth: '40%', height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#e0e0e0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   right: { display: 'flex', alignItems: 'center', gap: 8 },
   toggleBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 10px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' },
   dropdownContainer: { position: 'relative', display: 'flex', alignItems: 'stretch' },

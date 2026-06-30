@@ -51,10 +51,13 @@ export function createPcbRenderer(container: HTMLElement) {
       const padding = 0.95
       const scale = Math.min(rect.width / (maxX - minX), rect.height / (maxY - minY)) * padding
       const s = Math.max(0.0001, Math.min(scale, 1000))
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
       tree.scaleX = s
       tree.scaleY = -s
-      tree.x = rect.width / 2 - ((minX + maxX) / 2) * s
-      tree.y = rect.height / 2 - ((minY + maxY) / 2) * s
+      tree.x = rect.width / 2 - cx * s
+      // Y-axis is flipped; positive canvas Y maps to negative board Y
+      tree.y = rect.height / 2 + cy * s
     } catch (e) {
       console.error('PCB fit error:', e)
     }
@@ -551,7 +554,7 @@ export function createPcbRenderer(container: HTMLElement) {
 
 function addPadHighlight(group: Group, shape: ShapeData) {
   const hl = '#ffffff'
-  const sw = 1.5
+  const sw = 2.5
   if (shape.shapeType === 'circle') {
     const d = shape.params[0] + 6
     group.add(
