@@ -3,6 +3,7 @@
 package main
 
 import (
+	"runtime"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -82,10 +83,23 @@ func parseFilterWindows(filter string) (*uint16, error) {
 }
 
 func showFileDialogWindows(filter, title string, save bool, defaultName string) (string, error) {
-	// Common dialogs require STA on the calling thread
-	procCoInitializeEx.Call(0, uintptr(coInitApartmentThreaded))
-	defer procCoUninitialize.Call()
+	// Run the dialog on a dedicated thread with STA apartment. The main Go
+	// thread may already be in MTA, which causes GetOpenFileNameW to fail.
+	result := make(chan string, 1)
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 
+		procCoInitializeEx.Call(0, uintptr(coInitApartmentThreaded))
+		defer procCoUninitialize.Call()
+
+		path, _ := runFileDialogOnSTA(filter, title, save, defaultName)
+		result <- path
+	}()
+	return <-result, nil
+}
+
+func runFileDialogOnSTA(filter, title string, save bool, defaultName string) (string, error) {
 	filterPtr, err := parseFilterWindows(filter)
 	if err != nil {
 		return "", err
