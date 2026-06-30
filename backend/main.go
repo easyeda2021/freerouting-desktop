@@ -94,8 +94,6 @@ func main() {
 	w.Bind("saveFileDialog", saveFileDialog)
 	w.Bind("readFile", readFile)
 	w.Bind("writeFile", writeFile)
-	w.Bind("getRecentFiles", getRecentFiles)
-	w.Bind("setRecentFiles", setRecentFiles)
 
 	log.Println("Step 4: navigating...")
 	w.Navigate("http://127.0.0.1:1421")

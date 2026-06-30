@@ -1,13 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type Dispatch } from 'react'
 import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement, Lang, DisplayUnit } from './lib/board-types'
-
-declare global {
-  interface Window {
-    getRecentFiles?: () => Promise<string> | string
-    setRecentFiles?: (files: string) => Promise<string> | string
-  }
-}
-
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -245,24 +237,19 @@ export default function App() {
   const consoleBufferRef = useRef<string[]>([])
 
   useEffect(() => {
-    const loadRecentFiles = async () => {
-      try {
-        const raw = typeof window.getRecentFiles === 'function' ? await window.getRecentFiles() : null
-        const list = raw ? JSON.parse(raw) : null
-        if (Array.isArray(list)) {
-          dispatch({ type: 'SET_RECENT_FILES', files: list })
-          return
-        }
-      } catch (err) {
-        console.error('[recentFiles] failed to load from host', err)
+    try {
+      const recent = localStorage.getItem(RECENT_FILES_KEY)
+      console.log('[App init] localStorage recent raw:', recent)
+      if (recent) {
+        const list = JSON.parse(recent)
+        console.log('[App init] parsed recent files:', list.length, list)
+        dispatch({ type: 'SET_RECENT_FILES', files: list })
+      } else {
+        console.log('[App init] no recent files in localStorage')
       }
-      // Fallback to localStorage if host store is unavailable
-      try {
-        const recent = localStorage.getItem(RECENT_FILES_KEY)
-        if (recent) dispatch({ type: 'SET_RECENT_FILES', files: JSON.parse(recent) })
-      } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[App init] failed to load recent files', err)
     }
-    loadRecentFiles()
     try {
       const settings = localStorage.getItem(ROUTING_SETTINGS_KEY)
       if (settings) dispatch({ type: 'SET_ROUTING_SETTINGS', settings: JSON.parse(settings) })
@@ -278,16 +265,13 @@ export default function App() {
   }, [dispatch])
 
   useEffect(() => {
-    const save = async () => {
-      try {
-        const data = JSON.stringify(state.recentFiles)
-        if (typeof window.setRecentFiles === 'function') {
-          await window.setRecentFiles(data)
-        }
-        localStorage.setItem(RECENT_FILES_KEY, data)
-      } catch { /* ignore */ }
+    try {
+      const data = JSON.stringify(state.recentFiles)
+      localStorage.setItem(RECENT_FILES_KEY, data)
+      console.log('[App save] recent files saved:', state.recentFiles.length, state.recentFiles)
+    } catch (err) {
+      console.error('[App save] failed to save recent files', err)
     }
-    save()
   }, [state.recentFiles])
 
   useEffect(() => {

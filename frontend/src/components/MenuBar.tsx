@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, type ChangeEvent } from 'react'
-import { useApp, RECENT_FILES_KEY } from '../App'
+import { useApp, RECENT_FILES_KEY, ROUTING_SETTINGS_KEY } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, cancelRouting, setJobSettings, getDrcResults, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
@@ -33,8 +33,6 @@ declare global {
     openURL: (url: string) => void
     openFileDialog: () => Promise<string> | string
     readFile: (path: string) => Promise<string> | string
-    getRecentFiles?: () => Promise<string> | string
-    setRecentFiles?: (files: string) => Promise<string> | string
   }
 }
 
@@ -47,6 +45,21 @@ export default function MenuBar() {
   const jobStartedRef = useRef(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [recentOpen, setRecentOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_FILES_KEY)
+      const list = raw ? JSON.parse(raw) : []
+      console.log('[MenuBar init] loaded recent files:', list.length, list)
+      dispatch({ type: 'SET_RECENT_FILES', files: list })
+    } catch (err) {
+      console.error('[MenuBar init] failed to load recent files', err)
+    }
+    try {
+      const raw = localStorage.getItem(ROUTING_SETTINGS_KEY)
+      if (raw) dispatch({ type: 'SET_ROUTING_SETTINGS', settings: JSON.parse(raw) })
+    } catch { /* ignore */ }
+  }, [dispatch])
 
   useEffect(() => {
     if (!recentOpen) return
@@ -170,17 +183,16 @@ export default function MenuBar() {
     log('Info', `Loading design: ${fileName}`)
 
     if (fullPath) {
-      const next = [fullPath, ...state.recentFiles.filter((p) => p !== fullPath)].slice(0, 10)
-      dispatch({ type: 'SET_RECENT_FILES', files: next })
-      console.log('[recentFiles] added', fullPath, 'total', next.length)
       try {
-        const data = JSON.stringify(next)
-        localStorage.setItem(RECENT_FILES_KEY, data)
-        if (typeof window.setRecentFiles === 'function') {
-          await window.setRecentFiles(data)
-        }
+        const raw = localStorage.getItem(RECENT_FILES_KEY)
+        console.log('[recentFiles] raw before add:', raw)
+        const list: string[] = raw ? JSON.parse(raw) : []
+        const next = [fullPath, ...list.filter((p) => p !== fullPath)].slice(0, 10)
+        localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(next))
+        dispatch({ type: 'SET_RECENT_FILES', files: next })
+        console.log('[recentFiles] added', fullPath, 'total', next.length, 'list:', next)
       } catch (err) {
-        console.error('[recentFiles] failed to persist', fullPath, err)
+        console.error('[recentFiles] failed to add', fullPath, err)
       }
     }
 
@@ -267,6 +279,7 @@ export default function MenuBar() {
     let path: string
     try {
       path = await window.openFileDialog()
+      console.log('[openFileDialog] returned path:', path)
     } catch (err) {
       console.error('Native file dialog failed, falling back to HTML input:', err)
       fileInputRef.current?.click()
@@ -274,6 +287,7 @@ export default function MenuBar() {
     }
     if (!path) {
       // User cancelled native dialog; use HTML fallback
+      console.log('[openFileDialog] empty path, using HTML fallback')
       fileInputRef.current?.click()
       return
     }
