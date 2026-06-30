@@ -6,6 +6,7 @@ export default function BoardCanvas() {
   const { state, dispatch } = useApp()
   const containerRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<ReturnType<typeof createPcbRenderer> | null>(null)
+  const crosshairRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
   const hasFittedRef = useRef(false)
@@ -23,24 +24,27 @@ export default function BoardCanvas() {
     container.focus()
 
     const handleResize = () => {
-      // Delay slightly so container has finished layout
       setTimeout(() => rendererRef.current?.resize(), 100)
     }
 
     const resizeObserver = new ResizeObserver(() => {
-      // ResizeObserver fires when the container size actually changes;
-      // this catches maximize/minimize more reliably than window.resize.
       setTimeout(() => rendererRef.current?.resize(), 100)
     })
+
+    const updateCrosshair = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      if (crosshairRef.current) {
+        crosshairRef.current.style.setProperty('--x', `${x}px`)
+        crosshairRef.current.style.setProperty('--y', `${y}px`)
+      }
+    }
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
       const rect = container.getBoundingClientRect()
       rendererRef.current?.zoomBy(e.deltaY, e.clientX - rect.left, e.clientY - rect.top)
-      if (measurementRef.current.active) {
-        const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
-        if (pos) rendererRef.current?.drawCrosshair(pos)
-      }
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,7 +76,6 @@ export default function BoardCanvas() {
           const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
           if (!pos) return
           if (!measurementRef.current.start || measurementRef.current.end) {
-            // Start a new measurement, replacing any previous result
             dispatch({ type: 'SET_MEASUREMENT', measurement: { start: pos, end: null } })
           } else {
             dispatch({ type: 'SET_MEASUREMENT', measurement: { end: pos } })
@@ -91,18 +94,15 @@ export default function BoardCanvas() {
       const pos = rendererRef.current?.screenToBoard(e.clientX, e.clientY)
       if (pos) {
         dispatch({ type: 'SET_MEASUREMENT', measurement: { cursor: pos } })
-        if (measurementRef.current.active) {
-          rendererRef.current?.drawCrosshair(pos)
-        }
+      }
+      if (measurementRef.current.active) {
+        updateCrosshair(e)
       }
       if (!isDragging.current || !lastPos.current) return
       const dx = e.clientX - lastPos.current.x
       const dy = e.clientY - lastPos.current.y
       lastPos.current = { x: e.clientX, y: e.clientY }
       rendererRef.current?.panBy(dx, dy)
-      if (measurementRef.current.active && pos) {
-        rendererRef.current?.drawCrosshair(pos)
-      }
     }
 
     const handleMouseUp = () => {
@@ -146,9 +146,16 @@ export default function BoardCanvas() {
         rendererRef.current.render(state.boardData, state.layerVisibility, {
           hiddenNets,
           selectedNet: state.selectedNet,
+          selectedObject: state.selectedObject,
           layerColors: state.layerColors,
-          onSelectTrace: (trace) => dispatch({ type: 'SELECT_NET', netName: trace.netName || null }),
-          onSelectVia: (via) => dispatch({ type: 'SELECT_NET', netName: via.netName || null }),
+          onSelectTrace: (trace) => {
+            dispatch({ type: 'SELECT_OBJECT', object: { type: 'trace', id: trace.netName || '', netName: trace.netName, layer: trace.layer } })
+            dispatch({ type: 'SELECT_NET', netName: trace.netName || null })
+          },
+          onSelectVia: (via) => {
+            dispatch({ type: 'SELECT_OBJECT', object: { type: 'via', id: via.netName || '', netName: via.netName } })
+            dispatch({ type: 'SELECT_NET', netName: via.netName || null })
+          },
           onSelectComponent: (comp) => dispatch({ type: 'SELECT_OBJECT', object: { type: 'component', id: comp.refdes, refdes: comp.refdes } }),
           onSelectPad: (pad) => dispatch({ type: 'SELECT_OBJECT', object: pad }),
         })
@@ -164,17 +171,16 @@ export default function BoardCanvas() {
       hasFittedRef.current = false
       prevDsnRef.current = null
     }
-  }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.currentDsn, dispatch])
+  }, [state.boardData, state.layerVisibility, state.layerColors, state.nets, state.selectedNet, state.selectedObject, state.currentDsn, dispatch])
 
   useEffect(() => {
     rendererRef.current?.drawMeasurement(state.measurement.start, state.measurement.end)
-    if (!state.measurement.active) {
-      rendererRef.current?.drawCrosshair(null)
-    } else if (state.measurement.cursor) {
-      rendererRef.current?.drawCrosshair(state.measurement.cursor)
-    }
+    rendererRef.current?.drawCrosshair(null)
     if (containerRef.current) {
       containerRef.current.style.cursor = state.measurement.active ? 'none' : 'default'
+    }
+    if (crosshairRef.current) {
+      crosshairRef.current.style.display = state.measurement.active ? 'block' : 'none'
     }
   }, [state.measurement, state.boardData])
 
@@ -185,9 +191,40 @@ export default function BoardCanvas() {
     }
   }, [state.panTarget, dispatch])
 
-  return <div ref={containerRef} style={s.canvas} tabIndex={0} />
+  return (
+    <div ref={containerRef} style={s.canvas} tabIndex={0}>
+      <div ref={crosshairRef} style={s.crosshair}>
+        <div style={s.crosshairH} />
+        <div style={s.crosshairV} />
+      </div>
+    </div>
+  )
 }
 
 const s: Record<string, React.CSSProperties> = {
-  canvas: { flex: 1, background: '#0a0a1a', overflow: 'hidden', outline: 'none' },
+  canvas: { flex: 1, background: '#0a0a1a', overflow: 'hidden', outline: 'none', position: 'relative' },
+  crosshair: {
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    display: 'none',
+    '--x': '0px',
+    '--y': '0px',
+  } as React.CSSProperties,
+  crosshairH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 'var(--y)',
+    height: 1,
+    background: '#ffffff',
+  } as React.CSSProperties,
+  crosshairV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 'var(--x)',
+    width: 1,
+    background: '#ffffff',
+  } as React.CSSProperties,
 }

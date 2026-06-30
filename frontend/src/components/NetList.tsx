@@ -40,8 +40,6 @@ export default function NetList() {
     }
   }, [boardData, dispatch, nets])
 
-  if (!boardData) return null
-
   const filtered = nets.filter((n) => n.name.toLowerCase().includes(filter.toLowerCase()))
   const visibleCount = nets.filter((n) => n.visible).length
 
@@ -53,40 +51,55 @@ export default function NetList() {
         placeholder={language === 'zh' ? '过滤网络...' : 'Filter nets...'}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
+        disabled={!boardData}
       />
       <div style={s.list}>
-        {filtered.map((net) => (
-          <div
-            key={net.name}
-            style={{
-              ...s.item,
-              ...(selectedNet === net.name ? s.selected : {}),
-              opacity: net.visible ? 1 : 0.4,
-            }}
-            onClick={() => dispatch({ type: 'SELECT_NET', netName: selectedNet === net.name ? null : net.name })}
-          >
-            <input
-              type="checkbox"
-              checked={net.visible}
-              onClick={(e) => e.stopPropagation()}
-              onChange={() => dispatch({ type: 'TOGGLE_NET_VISIBILITY', netName: net.name })}
-            />
-            <span style={s.name}>{net.name}</span>
-            <span style={s.count}>T:{net.traceCount} V:{net.viaCount}</span>
-          </div>
-        ))}
+        {boardData ? (
+          filtered.map((net) => (
+            <div
+              key={net.name}
+              style={{
+                ...s.item,
+                ...(selectedNet === net.name ? s.selected : {}),
+                opacity: net.visible ? 1 : 0.4,
+              }}
+              onClick={() => dispatch({ type: 'SELECT_NET', netName: selectedNet === net.name ? null : net.name })}
+            >
+              <input
+                type="checkbox"
+                checked={net.visible}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => dispatch({ type: 'TOGGLE_NET_VISIBILITY', netName: net.name })}
+              />
+              <span style={s.name}>{net.name}</span>
+              <span style={s.count}>T:{net.traceCount} V:{net.viaCount}</span>
+            </div>
+          ))
+        ) : (
+          <div style={s.empty}>{language === 'zh' ? '打开 DSN 后显示网络列表' : 'Open a DSN to view nets'}</div>
+        )}
       </div>
     </div>
   )
 }
 
 const s: Record<string, React.CSSProperties> = {
-  panel: {},
+  panel: {
+    background: '#0f1c36',
+    border: '1px solid #1c3a5e',
+    borderRadius: 6,
+    padding: 10,
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+  },
   title: { fontSize: 11, fontWeight: 700, marginBottom: 8, color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
   filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #1c3a5e', borderRadius: 4, padding: '5px 8px', fontSize: 11, boxSizing: 'border-box', outline: 'none' },
-  list: { maxHeight: 220, overflowY: 'auto', marginTop: 8 },
+  list: { flex: 1, overflowY: 'auto', marginTop: 8, minHeight: 0 },
   item: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', fontSize: 11, cursor: 'pointer', borderRadius: 4, transition: 'background 0.1s' },
   selected: { background: '#0f3460' },
   name: { flex: 1, color: '#c8d4e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   count: { color: '#7e8fa8', fontSize: 10, fontVariantNumeric: 'tabular-nums' },
+  empty: { color: '#7e8fa8', fontSize: 11, padding: '8px 4px', fontStyle: 'italic' },
 }

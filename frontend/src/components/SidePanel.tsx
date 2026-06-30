@@ -65,8 +65,8 @@ export default function SidePanel() {
         </div>
       )}
 
-      <DrcPanel />
       <SelectionInfo />
+      <DrcPanel />
     </div>
   )
 }
@@ -100,35 +100,35 @@ function SelectionInfo() {
 const s: Record<string, React.CSSProperties> = {
   panel: {
     width: 220,
-    padding: 12,
+    padding: '12px 10px',
     background: '#16213e',
     borderLeft: '1px solid #0f3460',
     overflowY: 'auto',
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 8,
   },
   section: {
     background: '#0f1c36',
     border: '1px solid #1c3a5e',
     borderRadius: 6,
-    padding: 10,
+    padding: '8px 10px',
   },
   title: {
     fontSize: 11,
     fontWeight: 700,
-    marginBottom: 8,
+    marginBottom: 6,
     color: '#8fa3bf',
     textTransform: 'uppercase' as const,
     letterSpacing: 0.5,
   },
-  layerList: { display: 'flex', flexDirection: 'column', gap: 2 },
+  layerList: { display: 'flex', flexDirection: 'column', gap: 1 },
   layer: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '4px 6px',
+    padding: '3px 4px',
     fontSize: 12,
     borderRadius: 4,
   },
@@ -136,8 +136,8 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
@@ -179,7 +179,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '3px 0',
+    padding: '2px 0',
     fontSize: 11,
   },
   statLabel: { color: '#8fa3bf' },

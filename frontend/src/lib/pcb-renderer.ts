@@ -58,6 +58,7 @@ export function createPcbRenderer(container: HTMLElement) {
     options: {
       hiddenNets?: Set<string>
       selectedNet?: string | null
+      selectedObject?: SelectedObject | null
       layerColors?: Record<string, string>
       onSelectTrace?: (trace: TraceData) => void
       onSelectVia?: (via: ViaData) => void
@@ -74,6 +75,7 @@ export function createPcbRenderer(container: HTMLElement) {
       const outlineWidth = Math.max(bounds.maxDim * 0.002, 1)
       const hiddenNets = options.hiddenNets || new Set<string>()
       const selectedNet = options.selectedNet || null
+      const selectedObject = options.selectedObject || null
       const layerColors = options.layerColors || {}
 
       // Group traces by layer
@@ -238,11 +240,15 @@ export function createPcbRenderer(container: HTMLElement) {
               rotation: pin.rotation,
             })
             renderShape(shape, g, color)
+            const isPadSelected = selectedObject?.type === 'pad' && selectedObject.id === `${comp.refdes}-${pin.pinNumber}-${layer}`
+            if (isPadSelected) {
+              addPadHighlight(g, shape)
+            }
             if (options.onSelectPad) {
               g.on('pointer.down', () =>
                 options.onSelectPad!({
                   type: 'pad',
-                  id: `${comp.refdes}-${pin.pinNumber}`,
+                  id: `${comp.refdes}-${pin.pinNumber}-${layer}`,
                   refdes: comp.refdes,
                   pinNumber: pin.pinNumber,
                   layer,
@@ -511,6 +517,78 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   return { render, destroy, resize, zoomBy, panBy, getScale, fitView, screenToBoard, panTo, drawMeasurement, clearMeasurement, drawCrosshair }
+}
+
+function addPadHighlight(group: Group, shape: ShapeData) {
+  const hl = '#ffffff'
+  const sw = 1.5
+  if (shape.shapeType === 'circle') {
+    const d = shape.params[0] + 6
+    group.add(
+      new Ellipse({
+        x: -d / 2,
+        y: -d / 2,
+        width: d,
+        height: d,
+        fill: 'transparent',
+        stroke: hl,
+        strokeWidth: sw,
+      })
+    )
+  } else if (shape.shapeType === 'rect') {
+    const [x1, y1, x2, y2] = shape.params
+    const pad = 3
+    group.add(
+      new Rect({
+        x: x1 - pad,
+        y: y1 - pad,
+        width: x2 - x1 + pad * 2,
+        height: y2 - y1 + pad * 2,
+        fill: 'transparent',
+        stroke: hl,
+        strokeWidth: sw,
+      })
+    )
+  } else if (shape.shapeType === 'path') {
+    const width = shape.params[0]
+    if (width > 0) {
+      const d = width + 6
+      group.add(
+        new Ellipse({
+          x: -d / 2,
+          y: -d / 2,
+          width: d,
+          height: d,
+          fill: 'transparent',
+          stroke: hl,
+          strokeWidth: sw,
+        })
+      )
+    }
+  } else if (shape.shapeType === 'polygon') {
+    const coords = shape.params.slice(1)
+    if (coords.length >= 6) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (let i = 0; i < coords.length; i += 2) {
+        minX = Math.min(minX, coords[i])
+        minY = Math.min(minY, coords[i + 1])
+        maxX = Math.max(maxX, coords[i])
+        maxY = Math.max(maxY, coords[i + 1])
+      }
+      const pad = 3
+      group.add(
+        new Rect({
+          x: minX - pad,
+          y: minY - pad,
+          width: maxX - minX + pad * 2,
+          height: maxY - minY + pad * 2,
+          fill: 'transparent',
+          stroke: hl,
+          strokeWidth: sw,
+        })
+      )
+    }
+  }
 }
 
 function renderShape(shape: ShapeData, group: Group, color: string) {

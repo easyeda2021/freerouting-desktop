@@ -207,6 +207,7 @@ function reducer(state: AppState, action: Action): AppState {
         displayUnit: state.displayUnit,
         language: state.language,
         routingSettings: state.routingSettings,
+        recentFiles: state.recentFiles,
       }
     default:
       return state
