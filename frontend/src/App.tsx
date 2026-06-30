@@ -26,6 +26,7 @@ interface AppState {
   jobStage: string
   boardData: BoardData | null
   currentDsn: string | null
+  dsnContent: string | null
   currentPass: number
   routedCount: number
   incompleteCount: number
@@ -50,6 +51,7 @@ type Action =
   | { type: 'SET_BOARD_DATA'; data: BoardData }
   | { type: 'MERGE_BOARD_DATA'; data: BoardData }
   | { type: 'SET_DSN_FILE'; fileName: string }
+  | { type: 'SET_DSN_CONTENT'; content: string }
   | { type: 'ADD_LOG'; entry: LogEntry }
   | { type: 'SET_SCORE'; score: number }
   | { type: 'TOGGLE_LAYER'; layer: string }
@@ -75,6 +77,7 @@ const initialState: AppState = {
   jobStage: '',
   boardData: null,
   currentDsn: null,
+  dsnContent: null,
   currentPass: 0,
   routedCount: 0,
   incompleteCount: 0,
@@ -145,6 +148,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, logEntries: [...state.logEntries.slice(-999), action.entry] }
     case 'SET_DSN_FILE':
       return { ...state, currentDsn: action.fileName }
+    case 'SET_DSN_CONTENT':
+      return { ...state, dsnContent: action.content }
     case 'SET_SCORE':
       return { ...state, score: action.score }
     case 'TOGGLE_LAYER':

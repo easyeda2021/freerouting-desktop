@@ -43,6 +43,7 @@ export default function MenuBar() {
   const outputFetchedRef = useRef(false)
   const pendingMergeRef = useRef<BoardData | null>(null)
   const mergeTimerRef = useRef<number | null>(null)
+  const jobStartedRef = useRef(false)
   const [recentOpen, setRecentOpen] = useState(false)
 
   useEffect(() => {
@@ -152,6 +153,7 @@ export default function MenuBar() {
   const loadDsnFromContent = async (content: string, fileName: string, fullPath?: string) => {
     outputFetchedRef.current = false
     pendingMergeRef.current = null
+    jobStartedRef.current = false
     if (mergeTimerRef.current) {
       clearTimeout(mergeTimerRef.current)
       mergeTimerRef.current = null
@@ -168,6 +170,7 @@ export default function MenuBar() {
     const initialBoard = parseDsn(content)
     dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
     dispatch({ type: 'SET_DSN_FILE', fileName })
+    dispatch({ type: 'SET_DSN_CONTENT', content })
     log('Info', `Parsed DSN: ${initialBoard.components.length} components, ${initialBoard.traces.length} traces, ${initialBoard.vias.length} vias`)
 
     log('Info', 'Creating FreeRouting session...')
@@ -184,19 +187,49 @@ export default function MenuBar() {
     log('Info', 'DSN uploaded. Ready to route.')
   }
 
+  const startRoutingOnJob = async (jobId: string) => {
+    const settings = state.routingSettings
+    const hasSettings = settings && Object.keys(settings).length > 0
+    if (hasSettings) {
+      await setJobSettings(jobId, settings)
+      log('Info', `Applied routing settings: ${JSON.stringify(settings)}`)
+    }
+    await startRouting(jobId)
+    jobStartedRef.current = true
+    log('Info', 'Autorouting started')
+    setupRoutingStreams(jobId)
+  }
+
   const handleStartRouting = async () => {
-    if (!state.jobId) return
+    if (!state.sessionId || !state.dsnContent || !state.currentDsn) return
     log('Info', 'Starting autorouting...')
     try {
-      const settings = state.routingSettings
-      const hasSettings = settings && Object.keys(settings).length > 0
-      if (hasSettings) {
-        await setJobSettings(state.jobId, settings)
-        log('Info', `Applied routing settings: ${JSON.stringify(settings)}`)
+      let jobId = state.jobId
+      if (!jobId || jobStartedRef.current) {
+        // Existing job is already started/completed; enqueue a fresh job in the same session
+        outputFetchedRef.current = false
+        pendingMergeRef.current = null
+        if (mergeTimerRef.current) {
+          clearTimeout(mergeTimerRef.current)
+          mergeTimerRef.current = null
+        }
+        const initialBoard = parseDsn(state.dsnContent)
+        dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
+        dispatch({ type: 'SET_SCORE', score: 0 })
+        dispatch({ type: 'SET_DRC_RESULTS', violations: [] })
+        dispatch({ type: 'SELECT_NET', netName: null })
+        dispatch({ type: 'SELECT_OBJECT', object: null })
+
+        const job = await createJob(state.sessionId)
+        jobId = job.id
+        dispatch({ type: 'SET_JOB', jobId })
+        log('Info', `New job enqueued: ${jobId}`)
+
+        await uploadDsn(jobId, state.currentDsn, state.dsnContent)
+        log('Info', 'DSN uploaded to new job. Ready to route.')
       }
-      await startRouting(state.jobId)
-      log('Info', 'Autorouting started')
-      setupRoutingStreams(state.jobId)
+      if (!jobId) return
+      await startRoutingOnJob(jobId)
     } catch (err) {
       log('Error', `Failed to start routing: ${err}`)
     }
