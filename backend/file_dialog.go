@@ -231,6 +231,26 @@ func writeFile(path string, data string) string {
 	return ""
 }
 
+func getRecentFilesPath() string {
+	return filepath.Join(getFreeRoutingDir(), "recent_files.json")
+}
+
+func getRecentFiles() string {
+	data, err := os.ReadFile(getRecentFilesPath())
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+func setRecentFiles(files string) string {
+	err := os.WriteFile(getRecentFilesPath(), []byte(files), 0644)
+	if err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
 func openURL(url string) {
 	switch runtime.GOOS {
 	case "windows":

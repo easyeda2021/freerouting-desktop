@@ -1,5 +1,13 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type Dispatch } from 'react'
 import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement, Lang, DisplayUnit } from './lib/board-types'
+
+declare global {
+  interface Window {
+    getRecentFiles?: () => Promise<string> | string
+    setRecentFiles?: (files: string) => Promise<string> | string
+  }
+}
+
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -237,10 +245,24 @@ export default function App() {
   const consoleBufferRef = useRef<string[]>([])
 
   useEffect(() => {
-    try {
-      const recent = localStorage.getItem(RECENT_FILES_KEY)
-      if (recent) dispatch({ type: 'SET_RECENT_FILES', files: JSON.parse(recent) })
-    } catch { /* ignore */ }
+    const loadRecentFiles = async () => {
+      try {
+        const raw = typeof window.getRecentFiles === 'function' ? await window.getRecentFiles() : null
+        const list = raw ? JSON.parse(raw) : null
+        if (Array.isArray(list)) {
+          dispatch({ type: 'SET_RECENT_FILES', files: list })
+          return
+        }
+      } catch (err) {
+        console.error('[recentFiles] failed to load from host', err)
+      }
+      // Fallback to localStorage if host store is unavailable
+      try {
+        const recent = localStorage.getItem(RECENT_FILES_KEY)
+        if (recent) dispatch({ type: 'SET_RECENT_FILES', files: JSON.parse(recent) })
+      } catch { /* ignore */ }
+    }
+    loadRecentFiles()
     try {
       const settings = localStorage.getItem(ROUTING_SETTINGS_KEY)
       if (settings) dispatch({ type: 'SET_ROUTING_SETTINGS', settings: JSON.parse(settings) })
@@ -256,7 +278,16 @@ export default function App() {
   }, [dispatch])
 
   useEffect(() => {
-    try { localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(state.recentFiles)) } catch { /* ignore */ }
+    const save = async () => {
+      try {
+        const data = JSON.stringify(state.recentFiles)
+        if (typeof window.setRecentFiles === 'function') {
+          await window.setRecentFiles(data)
+        }
+        localStorage.setItem(RECENT_FILES_KEY, data)
+      } catch { /* ignore */ }
+    }
+    save()
   }, [state.recentFiles])
 
   useEffect(() => {
