@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect, useRef, type Dispatch } from 'react'
+import { createContext, useContext, useReducer, useEffect, type Dispatch } from 'react'
 import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement, Lang, DisplayUnit } from './lib/board-types'
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
@@ -233,8 +233,6 @@ export const LANGUAGE_KEY = 'fr_language'
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
-  const consoleWinRef = useRef<Window | null>(null)
-  const consoleBufferRef = useRef<string[]>([])
 
   useEffect(() => {
     try {
@@ -285,89 +283,6 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(LANGUAGE_KEY, state.language) } catch { /* ignore */ }
   }, [state.language])
-
-  useEffect(() => {
-    const original = {
-      log: console.log,
-      warn: console.warn,
-      error: console.error,
-    }
-    const push = (level: 'log' | 'warn' | 'error', args: unknown[]) => {
-      const text = args
-        .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
-        .join(' ')
-      const line = `[${level.toUpperCase()}] ${text}`
-      consoleBufferRef.current.push(line)
-      if (consoleBufferRef.current.length > 2000) consoleBufferRef.current.shift()
-
-      const win = consoleWinRef.current
-      if (win && !win.closed) {
-        const body = win.document.getElementById('log')
-        if (body) {
-          const div = win.document.createElement('div')
-          div.className = level
-          div.textContent = line
-          body.appendChild(div)
-          win.scrollTo(0, body.scrollHeight)
-        }
-      }
-      original[level].apply(console, args)
-    }
-
-    console.log = (...args: unknown[]) => push('log', args)
-    console.warn = (...args: unknown[]) => push('warn', args)
-    console.error = (...args: unknown[]) => push('error', args)
-
-    const openConsole = () => {
-      if (consoleWinRef.current && !consoleWinRef.current.closed) {
-        consoleWinRef.current.focus()
-        return
-      }
-      const win = window.open('', 'fr-console', 'width=900,height=500,resizable=yes,scrollbars=yes')
-      if (!win) return
-      consoleWinRef.current = win
-      win.document.write(
-        `<html><head><title>Console</title>` +
-        `<style>` +
-        `body{background:#0a0a1a;color:#e0e0e0;font:12px monospace;margin:0;padding:8px;white-space:pre-wrap;}` +
-        `.error{color:#ff6b6b}.warn{color:#f5a623}` +
-        `</style></head><body id="log"></body></html>`
-      )
-      win.document.close()
-      const body = win.document.getElementById('log')
-      if (body) {
-        for (const line of consoleBufferRef.current) {
-          const div = win.document.createElement('div')
-          div.className = line.startsWith('[ERROR]') ? 'error' : line.startsWith('[WARN]') ? 'warn' : ''
-          div.textContent = line
-          body.appendChild(div)
-        }
-        win.scrollTo(0, body.scrollHeight)
-      }
-      win.addEventListener('beforeunload', () => { consoleWinRef.current = null })
-    }
-
-    const handleError = (e: ErrorEvent) => {
-      console.error(e.message, e.filename, e.lineno, e.colno, e.error)
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'F12') {
-        e.preventDefault()
-        openConsole()
-      }
-    }
-
-    window.addEventListener('error', handleError)
-    window.addEventListener('keydown', handleKey)
-
-    return () => {
-      console.log = original.log
-      console.warn = original.warn
-      console.error = original.error
-      window.removeEventListener('error', handleError)
-      window.removeEventListener('keydown', handleKey)
-    }
-  }, [])
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
