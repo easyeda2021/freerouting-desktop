@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -73,15 +74,15 @@ func parseFilterWindows(filter string) (*uint16, error) {
 	if len(parts)%2 != 0 {
 		parts = append(parts, "*.*")
 	}
-	var sb strings.Builder
+	var u16 []uint16
 	for i := 0; i < len(parts); i += 2 {
-		sb.WriteString(parts[i])
-		sb.WriteByte(0)
-		sb.WriteString(parts[i+1])
-		sb.WriteByte(0)
+		u16 = append(u16, utf16.Encode([]rune(parts[i]))...)
+		u16 = append(u16, 0)
+		u16 = append(u16, utf16.Encode([]rune(parts[i+1]))...)
+		u16 = append(u16, 0)
 	}
-	sb.WriteByte(0)
-	return syscall.UTF16PtrFromString(sb.String())
+	u16 = append(u16, 0) // final terminating null
+	return &u16[0], nil
 }
 
 func showFileDialogWindows(filter, title string, save bool, defaultName string) (string, error) {
