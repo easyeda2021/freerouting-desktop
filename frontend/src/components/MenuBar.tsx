@@ -174,6 +174,10 @@ export default function MenuBar() {
       mergeTimerRef.current = null
     }
     try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
+
+    dispatch({ type: 'RESET' })
+    log('Info', `Loading design: ${fileName}`)
+
     if (fullPath) {
       try {
         const raw = localStorage.getItem(RECENT_FILES_KEY)
@@ -183,9 +187,6 @@ export default function MenuBar() {
         dispatch({ type: 'SET_RECENT_FILES', files: next })
       } catch { /* ignore */ }
     }
-
-    dispatch({ type: 'RESET' })
-    log('Info', `Loading design: ${fileName}`)
 
     const initialBoard = parseDsn(content)
     dispatch({ type: 'SET_BOARD_DATA', data: initialBoard })
