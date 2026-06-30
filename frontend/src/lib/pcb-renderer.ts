@@ -5,7 +5,6 @@ import { getLayerColor } from './layer-colors'
 
 const VIA_COLOR = '#a0a0a0'
 const VIA_STROKE = '#555555'
-const RATSNEST_COLOR = '#ffffff'
 
 export function createPcbRenderer(container: HTMLElement) {
   const app = new App({
@@ -30,9 +29,19 @@ export function createPcbRenderer(container: HTMLElement) {
   let lastBounds = { minX: -500, minY: -500, maxX: 500, maxY: 500, maxDim: 1000 }
   let emptyClickHandler: (() => void) | null = null
 
+  function isOverlayDescendant(leaf: any): boolean {
+    let node: any = leaf
+    while (node) {
+      if (node === gridGroup || node === measurementGroup || node === crosshairGroup) return true
+      node = node.parent
+    }
+    return false
+  }
+
   app.tree.on('pointer.down', (e: any) => {
-    // Clicking the tree itself (not a child shape) means empty area
-    if (e.target === app.tree && emptyClickHandler) {
+    // Empty area: clicked the tree background or an overlay (grid/crosshair/measurement)
+    if (!emptyClickHandler) return
+    if (e.target === app.tree || isOverlayDescendant(e.target)) {
       emptyClickHandler()
     }
   })
@@ -393,8 +402,10 @@ export function createPcbRenderer(container: HTMLElement) {
     measurementGroup.clear()
     if (!start) return
 
-    const r = Math.max(lastBounds.maxDim * 0.004, 3)
-    const lineWidth = Math.max(lastBounds.maxDim * 0.0015, 0.5)
+    // Keep measurement marks at a constant screen size regardless of zoom
+    const scale = Math.max(Math.abs(getScale()), 0.0001)
+    const r = 2 / scale
+    const lineWidth = 1 / scale
     const color = '#f5a623'
 
     measurementGroup.add(
@@ -405,7 +416,7 @@ export function createPcbRenderer(container: HTMLElement) {
         height: r * 2,
         fill: color,
         stroke: '#ffffff',
-        strokeWidth: Math.max(r * 0.08, 0.5),
+        strokeWidth: 0.5 / scale,
       })
     )
 
@@ -419,7 +430,7 @@ export function createPcbRenderer(container: HTMLElement) {
         height: r * 2,
         fill: color,
         stroke: '#ffffff',
-        strokeWidth: Math.max(r * 0.08, 0.5),
+        strokeWidth: 0.5 / scale,
       })
     )
 
@@ -443,13 +454,13 @@ export function createPcbRenderer(container: HTMLElement) {
     const midY = (start[1] + end[1]) / 2
 
     // Offset label slightly perpendicular to the measurement line
-    const offset = Math.max(lastBounds.maxDim * 0.012, 12)
+    const offset = 8 / scale
     const ox = -Math.sin(angle) * offset
     const oy = Math.cos(angle) * offset
 
     const label = formatLength(dist)
     const labelText = `${label.mm} / ${label.mil}`
-    const fontSize = Math.max(lastBounds.maxDim * 0.012, 12)
+    const fontSize = 10 / scale
     const text = new Text({
       text: labelText,
       x: midX + ox,
@@ -471,8 +482,9 @@ export function createPcbRenderer(container: HTMLElement) {
     measurementGroup.clear()
     if (!start || !cursor) return
 
-    const r = Math.max(lastBounds.maxDim * 0.004, 3)
-    const lineWidth = Math.max(lastBounds.maxDim * 0.0015, 0.5)
+    const scale = Math.max(Math.abs(getScale()), 0.0001)
+    const r = 2 / scale
+    const lineWidth = 1 / scale
     const color = '#f5a623'
 
     measurementGroup.add(
@@ -483,7 +495,7 @@ export function createPcbRenderer(container: HTMLElement) {
         height: r * 2,
         fill: color,
         stroke: '#ffffff',
-        strokeWidth: Math.max(r * 0.08, 0.5),
+        strokeWidth: 0.5 / scale,
       })
     )
 
@@ -495,7 +507,7 @@ export function createPcbRenderer(container: HTMLElement) {
         height: r * 2,
         fill: color,
         stroke: '#ffffff',
-        strokeWidth: Math.max(r * 0.08, 0.5),
+        strokeWidth: 0.5 / scale,
       })
     )
 
@@ -815,7 +827,7 @@ function drawRatsnest(
     if (reps.length < 2) continue
 
     const isSelected = selectedNet !== null && netName === selectedNet
-    const color = isSelected ? '#ffffff' : (layerColors['ratsnest'] || RATSNEST_COLOR)
+    const color = isSelected ? '#ffffff' : getLayerColor('ratsnest', layerColors)
     for (const [x1, y1, x2, y2] of mstEdges(reps)) {
       group.add(
         new Line({

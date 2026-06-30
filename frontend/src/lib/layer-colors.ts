@@ -15,6 +15,7 @@ const DEFAULT_PALETTE = [
 
 export function getLayerColor(layerName: string, overrides?: Record<string, string>): string {
   if (overrides?.[layerName]) return overrides[layerName]
+  if (layerName === 'ratsnest') return '#ffffff'
   const hash = layerName.split('').reduce((h, c) => h + c.charCodeAt(0), 0)
   return DEFAULT_PALETTE[hash % DEFAULT_PALETTE.length]
 }
