@@ -49,8 +49,12 @@ export default function MenuBar() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(RECENT_FILES_KEY)
-      if (raw) dispatch({ type: 'SET_RECENT_FILES', files: JSON.parse(raw) })
-    } catch { /* ignore */ }
+      const list = raw ? JSON.parse(raw) : []
+      dispatch({ type: 'SET_RECENT_FILES', files: list })
+      console.log('[recentFiles] loaded', list.length, list)
+    } catch (err) {
+      console.error('[recentFiles] failed to load', err)
+    }
     try {
       const raw = localStorage.getItem(ROUTING_SETTINGS_KEY)
       if (raw) dispatch({ type: 'SET_ROUTING_SETTINGS', settings: JSON.parse(raw) })
@@ -185,7 +189,10 @@ export default function MenuBar() {
         const next = [fullPath, ...list.filter((p) => p !== fullPath)].slice(0, 10)
         localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(next))
         dispatch({ type: 'SET_RECENT_FILES', files: next })
-      } catch { /* ignore */ }
+        console.log('[recentFiles] added', fullPath, 'total', next.length)
+      } catch (err) {
+        console.error('[recentFiles] failed to add', fullPath, err)
+      }
     }
 
     const initialBoard = parseDsn(content)

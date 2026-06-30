@@ -53,6 +53,9 @@ export default function BoardCanvas() {
         if (measurementRef.current.active) {
           dispatch({ type: 'SET_MEASUREMENT', measurement: { active: false, start: null, end: null, cursor: null } })
           measurePhaseRef.current = 'idle'
+        } else {
+          dispatch({ type: 'SELECT_OBJECT', object: null })
+          dispatch({ type: 'SELECT_NET', netName: null })
         }
         return
       }
@@ -167,6 +170,10 @@ export default function BoardCanvas() {
           },
           onSelectComponent: (comp) => dispatch({ type: 'SELECT_OBJECT', object: { type: 'component', id: comp.refdes, refdes: comp.refdes } }),
           onSelectPad: (pad) => dispatch({ type: 'SELECT_OBJECT', object: pad }),
+          onEmptyClick: () => {
+            dispatch({ type: 'SELECT_OBJECT', object: null })
+            dispatch({ type: 'SELECT_NET', netName: null })
+          },
         })
         if (isNewDsn || !hasFittedRef.current) {
           // Let Leafer finish layout before fitting

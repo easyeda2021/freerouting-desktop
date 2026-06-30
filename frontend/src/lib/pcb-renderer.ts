@@ -23,6 +23,14 @@ export function createPcbRenderer(container: HTMLElement) {
   const crosshairGroup = new Group({})
   let ratsnestGroup: Group | null = null
   let lastBounds = { minX: -500, minY: -500, maxX: 500, maxY: 500, maxDim: 1000 }
+  let emptyClickHandler: (() => void) | null = null
+
+  app.tree.on('pointer.down', (e: any) => {
+    // Clicking the tree itself (not a child shape) means empty area
+    if (e.target === app.tree && emptyClickHandler) {
+      emptyClickHandler()
+    }
+  })
 
   function clear() {
     layerGroups.forEach((g) => g.clear())
@@ -75,6 +83,7 @@ export function createPcbRenderer(container: HTMLElement) {
       onSelectVia?: (via: ViaData) => void
       onSelectComponent?: (comp: ComponentData) => void
       onSelectPad?: (pad: SelectedObject) => void
+      onEmptyClick?: () => void
     } = {}
   ) {
     try {
@@ -88,6 +97,7 @@ export function createPcbRenderer(container: HTMLElement) {
       const selectedNet = options.selectedNet || null
       const selectedObject = options.selectedObject || null
       const layerColors = options.layerColors || {}
+      emptyClickHandler = options.onEmptyClick || null
 
       // Group traces by layer
       for (const trace of data.traces) {
