@@ -1,4 +1,17 @@
-const DEFAULT_PALETTE = ['#e94560', '#0f3460', '#16c79a', '#f5a623', '#a855f7', '#06b6d4', '#84cc16', '#ec4899']
+const DEFAULT_PALETTE = [
+  '#ff3b30', // red
+  '#34c759', // green
+  '#007aff', // blue
+  '#ffcc00', // yellow
+  '#af52de', // purple
+  '#ff9500', // orange
+  '#5ac8fa', // cyan
+  '#ff2d55', // pink
+  '#00c7be', // teal
+  '#5856d6', // indigo
+  '#ff6b22', // deep orange
+  '#64d2ff', // sky
+]
 
 export function getLayerColor(layerName: string, overrides?: Record<string, string>): string {
   if (overrides?.[layerName]) return overrides[layerName]

@@ -22,10 +22,7 @@ type FreeRoutingStatus struct {
 }
 
 type Config struct {
-	BinPath         string                 `json:"bin_path"`
-	LastDir         string                 `json:"last_dir"`
-	RecentFiles     []string               `json:"recent_files,omitempty"`
-	RoutingSettings map[string]interface{} `json:"routing_settings,omitempty"`
+	BinPath string `json:"bin_path"`
 }
 
 var (
@@ -153,57 +150,6 @@ func saveFreeRoutingPath(path string) {
 	cfg := loadConfig()
 	cfg.BinPath = path
 	saveConfig(cfg)
-}
-
-func getLastDir() string {
-	dir := loadConfig().LastDir
-	log.Printf("getLastDir returned: %q", dir)
-	return dir
-}
-
-func saveLastDir(dir string) {
-	log.Printf("saveLastDir called with: %q", dir)
-	cfg := loadConfig()
-	cfg.LastDir = dir
-	if err := saveConfig(cfg); err != nil {
-		log.Printf("saveLastDir failed: %v", err)
-	}
-}
-
-func getRecentFiles() []string {
-	return loadConfig().RecentFiles
-}
-
-func addRecentFile(path string) {
-	if path == "" {
-		return
-	}
-	cfg := loadConfig()
-	newList := []string{path}
-	for _, p := range cfg.RecentFiles {
-		if p != path {
-			newList = append(newList, p)
-		}
-	}
-	if len(newList) > 10 {
-		newList = newList[:10]
-	}
-	cfg.RecentFiles = newList
-	if err := saveConfig(cfg); err != nil {
-		log.Printf("addRecentFile failed: %v", err)
-	}
-}
-
-func getRoutingSettings() map[string]interface{} {
-	return loadConfig().RoutingSettings
-}
-
-func saveRoutingSettings(settings map[string]interface{}) {
-	cfg := loadConfig()
-	cfg.RoutingSettings = settings
-	if err := saveConfig(cfg); err != nil {
-		log.Printf("saveRoutingSettings failed: %v", err)
-	}
 }
 
 func getFreeRoutingVersionFromAPI() string {

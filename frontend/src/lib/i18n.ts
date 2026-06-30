@@ -42,6 +42,8 @@ const resources = {
     via: 'Via',
     ratsnest: 'Ratsnest',
     drc: 'DRC',
+    filterNets: 'Filter nets...',
+    openDsnHint: 'Open a DSN to view nets',
   },
   zh: {
     hideLayer: '隐藏层',
@@ -84,6 +86,8 @@ const resources = {
     via: '过孔',
     ratsnest: '飞线',
     drc: 'DRC',
+    filterNets: '过滤网络...',
+    openDsnHint: '打开 DSN 后显示网络列表',
   },
 } as const
 

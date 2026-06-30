@@ -37,29 +37,12 @@ export default function RoutingSettings() {
   const settings = { ...defaultSettings, ...state.routingSettings }
 
   useEffect(() => {
-    const init = async () => {
-      let saved: RoutingSettings = {}
-      try {
-        if ('getRoutingSettings' in window) {
-          const remote = await window.getRoutingSettings()
-          saved = (remote && typeof remote === 'object' ? remote : {}) as RoutingSettings
-        }
-      } catch { /* ignore */ }
-      if (Object.keys(saved).length === 0) {
-        saved = loadStoredSettings()
-      }
-      dispatch({ type: 'SET_ROUTING_SETTINGS', settings: { ...defaultSettings, ...saved } })
-    }
-    init()
+    const saved = loadStoredSettings()
+    dispatch({ type: 'SET_ROUTING_SETTINGS', settings: { ...defaultSettings, ...saved } })
   }, [dispatch])
 
-  const save = async (next: RoutingSettings) => {
+  const save = (next: RoutingSettings) => {
     saveStoredSettings(next)
-    try {
-      if ('saveRoutingSettings' in window) {
-        await window.saveRoutingSettings(next)
-      }
-    } catch { /* ignore */ }
   }
 
   const update = (patch: Partial<RoutingSettings>) => {

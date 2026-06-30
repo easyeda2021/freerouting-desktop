@@ -52,19 +52,6 @@ func openExecutableDialogWindows() (string, error) {
 	return fileDialogWindows("Executable (*.exe)|*.exe|All Files (*.*)|*.*", "Select FreeRouting Executable")
 }
 
-func initialDirScriptWindows() string {
-	dir := getLastDir()
-	if dir == "" {
-		return ""
-	}
-	if _, err := os.Stat(dir); err != nil {
-		return ""
-	}
-	escaped := strings.ReplaceAll(dir, `\`, `\\`)
-	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
-	return fmt.Sprintf(`$dialog.InitialDirectory = "%s"`, escaped)
-}
-
 func fileDialogWindows(filter, title string) (string, error) {
 	script := fmt.Sprintf(`
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -74,12 +61,11 @@ $form.TopMost = $true
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Filter = "%s"
 $dialog.Title = "%s"
-%s
 if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 	$dialog.FileName
 }
 $form.Dispose()
-`, filter, title, initialDirScriptWindows())
+`, filter, title)
 	// DO NOT hide window for file dialogs — PowerShell needs a visible window
 	// to show Windows.Forms dialogs properly
 	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
@@ -99,12 +85,11 @@ $dialog = New-Object System.Windows.Forms.SaveFileDialog
 $dialog.Filter = "SES Files (*.ses)|*.ses|All Files (*.*)|*.*"
 $dialog.FileName = "%s"
 $dialog.Title = "Save SES File"
-%s
 if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 	$dialog.FileName
 }
 $form.Dispose()
-`, defaultName, initialDirScriptWindows())
+`, defaultName)
 	// DO NOT hide window for file dialogs
 	out, err := exec.Command("powershell", "-Sta", "-NoProfile", "-Command", script).Output()
 	if err != nil {
@@ -113,23 +98,9 @@ $form.Dispose()
 	return strings.TrimSpace(string(out)), nil
 }
 
-func initialDirMacOS() string {
-	dir := getLastDir()
-	if dir == "" {
-		return ""
-	}
-	if _, err := os.Stat(dir); err != nil {
-		return ""
-	}
-	return dir
-}
-
 // macOS: use osascript for file dialogs
 func openFileDialogMacOS() (string, error) {
 	script := `osascript -e 'POSIX path of (choose file of type {"dsn", "ses"})'`
-	if dir := initialDirMacOS(); dir != "" {
-		script = fmt.Sprintf(`osascript -e 'POSIX path of (choose file of type {"dsn", "ses"} default location (POSIX file "%s"))'`, dir)
-	}
 	out, err := exec.Command("sh", "-c", script).Output()
 	if err != nil {
 		return "", err
@@ -139,9 +110,6 @@ func openFileDialogMacOS() (string, error) {
 
 func openExecutableDialogMacOS() (string, error) {
 	script := `osascript -e 'POSIX path of (choose file)'`
-	if dir := initialDirMacOS(); dir != "" {
-		script = fmt.Sprintf(`osascript -e 'POSIX path of (choose file default location (POSIX File "%s"))'`, dir)
-	}
 	out, err := exec.Command("sh", "-c", script).Output()
 	if err != nil {
 		return "", err
@@ -151,25 +119,11 @@ func openExecutableDialogMacOS() (string, error) {
 
 func saveFileDialogMacOS(defaultName string) (string, error) {
 	script := fmt.Sprintf(`osascript -e 'POSIX path of (choose file name default name "%s")'`, defaultName)
-	if dir := initialDirMacOS(); dir != "" {
-		script = fmt.Sprintf(`osascript -e 'POSIX path of (choose file name default name "%s" default location (POSIX file "%s"))'`, defaultName, dir)
-	}
 	out, err := exec.Command("sh", "-c", script).Output()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
-}
-
-func initialDirLinux() string {
-	dir := getLastDir()
-	if dir == "" {
-		return ""
-	}
-	if _, err := os.Stat(dir); err != nil {
-		return ""
-	}
-	return dir
 }
 
 // Linux: use zenity or kdialog
@@ -190,12 +144,8 @@ func fileDialogLinux(fileFilter string) (string, error) {
 			return "", fmt.Errorf("no file dialog tool found (install zenity or kdialog)")
 		}
 	}
-	startDir := initialDirLinux()
-	if startDir == "" {
-		startDir = "."
-	}
 	if dialog == "zenity" {
-		args := []string{"--file-selection", "--filename=" + startDir + string(filepath.Separator)}
+		args := []string{"--file-selection", "--filename=." + string(filepath.Separator)}
 		if fileFilter != "" {
 			args = append(args, "--file-filter", fileFilter)
 		}
@@ -210,7 +160,7 @@ func fileDialogLinux(fileFilter string) (string, error) {
 	if fileFilter != "" {
 		filter = fileFilter
 	}
-	out, err := exec.Command("kdialog", "--getopenfilename", startDir, filter).Output()
+	out, err := exec.Command("kdialog", "--getopenfilename", ".", filter).Output()
 	if err != nil {
 		return "", err
 	}
@@ -226,22 +176,14 @@ func saveFileDialogLinux(defaultName string) (string, error) {
 			return "", fmt.Errorf("no file dialog tool found (install zenity or kdialog)")
 		}
 	}
-	startDir := initialDirLinux()
-	if startDir == "" {
-		startDir = "."
-	}
 	if dialog == "zenity" {
-		filename := defaultName
-		if startDir != "" {
-			filename = filepath.Join(startDir, defaultName)
-		}
-		out, err := exec.Command("zenity", "--file-selection", "--save", "--confirm-overwrite", "--filename="+filename).Output()
+		out, err := exec.Command("zenity", "--file-selection", "--save", "--confirm-overwrite", "--filename="+defaultName).Output()
 		if err != nil {
 			return "", err
 		}
 		return strings.TrimSpace(string(out)), nil
 	}
-	out, err := exec.Command("kdialog", "--getsavefilename", filepath.Join(startDir, defaultName)).Output()
+	out, err := exec.Command("kdialog", "--getsavefilename", ".", defaultName).Output()
 	if err != nil {
 		return "", err
 	}
@@ -261,9 +203,6 @@ func openFileDialog() string {
 	if err != nil {
 		return ""
 	}
-	if path != "" {
-		saveLastDir(filepath.Dir(path))
-	}
 	return path
 }
 
@@ -272,9 +211,6 @@ func saveFileDialog(defaultName string) string {
 	log.Printf("saveFileDialog native returned path=%q err=%v", path, err)
 	if err != nil {
 		return ""
-	}
-	if path != "" {
-		saveLastDir(filepath.Dir(path))
 	}
 	return path
 }

@@ -10,6 +10,10 @@ export default function NetList() {
   useMemo(() => {
     if (!boardData) return
     const netMap = new Map<string, { traces: number; vias: number }>()
+    // Nets come from DSN netlist, not just routed traces/vias
+    for (const netName of Object.keys(boardData.netPins || {})) {
+      netMap.set(netName, { traces: 0, vias: 0 })
+    }
     for (const t of boardData.traces) {
       if (!t.netName) continue
       const cur = netMap.get(t.netName) || { traces: 0, vias: 0 }
@@ -48,7 +52,7 @@ export default function NetList() {
       <h3 style={s.title}>{t('nets', language)} ({visibleCount}/{nets.length})</h3>
       <input
         style={s.filter}
-        placeholder={language === 'zh' ? '过滤网络...' : 'Filter nets...'}
+        placeholder={t('filterNets', language)}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         disabled={!boardData}
@@ -76,7 +80,7 @@ export default function NetList() {
             </div>
           ))
         ) : (
-          <div style={s.empty}>{language === 'zh' ? '打开 DSN 后显示网络列表' : 'Open a DSN to view nets'}</div>
+          <div style={s.empty}>{t('openDsnHint', language)}</div>
         )}
       </div>
     </div>

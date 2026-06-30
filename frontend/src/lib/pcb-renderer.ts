@@ -5,7 +5,7 @@ import { getLayerColor } from './layer-colors'
 
 const VIA_COLOR = '#a0a0a0'
 const VIA_STROKE = '#555555'
-const RATSNEST_COLOR = '#00bfff'
+const RATSNEST_COLOR = '#ffffff'
 
 export function createPcbRenderer(container: HTMLElement) {
   const app = new App({
@@ -21,6 +21,7 @@ export function createPcbRenderer(container: HTMLElement) {
   const measurementGroup = new Group({})
   const gridGroup = new Group({})
   const crosshairGroup = new Group({})
+  let ratsnestGroup: Group | null = null
   let lastBounds = { minX: -500, minY: -500, maxX: 500, maxY: 500, maxDim: 1000 }
 
   function clear() {
@@ -44,9 +45,16 @@ export function createPcbRenderer(container: HTMLElement) {
   function fitView() {
     try {
       const tree = app.tree as any
-      tree.zoom?.('fit')
-      // Preserve Y-flip after fit
-      tree.scaleY = -Math.abs(tree.scaleX || 1)
+      const rect = container.getBoundingClientRect()
+      const { minX, minY, maxX, maxY, maxDim } = lastBounds
+      if (!Number.isFinite(maxDim) || maxDim <= 0 || rect.width <= 0 || rect.height <= 0) return
+      const padding = 0.95
+      const scale = Math.min(rect.width / (maxX - minX), rect.height / (maxY - minY)) * padding
+      const s = Math.max(0.0001, Math.min(scale, 1000))
+      tree.scaleX = s
+      tree.scaleY = -s
+      tree.x = rect.width / 2 - ((minX + maxX) / 2) * s
+      tree.y = rect.height / 2 - ((minY + maxY) / 2) * s
     } catch (e) {
       console.error('PCB fit error:', e)
     }
@@ -133,6 +141,14 @@ export function createPcbRenderer(container: HTMLElement) {
 
       const padstackMap = new Map(data.padstacks.map((ps) => [ps.name, ps]))
       const imageMap = new Map(data.images.map((img) => [img.name, img]))
+
+      // Build pin -> net lookup for highlighting pads by selected net
+      const pinToNet = new Map<string, string>()
+      for (const [netName, refs] of Object.entries(data.netPins || {})) {
+        for (const ref of refs) {
+          pinToNet.set(`${ref.refdes}-${ref.pinNumber}`, netName)
+        }
+      }
 
       // Render component body outlines behind pads so pads remain visible
       const compGroup = new Group({})
@@ -240,8 +256,10 @@ export function createPcbRenderer(container: HTMLElement) {
               rotation: pin.rotation,
             })
             renderShape(shape, g, color)
+            const padNet = pinToNet.get(`${comp.refdes}-${pin.pinNumber}`)
             const isPadSelected = selectedObject?.type === 'pad' && selectedObject.id === `${comp.refdes}-${pin.pinNumber}-${layer}`
-            if (isPadSelected) {
+            const isPadNetSelected = selectedNet !== null && padNet === selectedNet
+            if (isPadSelected || isPadNetSelected) {
               addPadHighlight(g, shape)
             }
             if (options.onSelectPad) {
@@ -262,10 +280,10 @@ export function createPcbRenderer(container: HTMLElement) {
       }
 
       // Render ratsnest airwires
-      const ratsnestGroup = new Group({})
+      ratsnestGroup = new Group({})
       app.tree.add(ratsnestGroup)
       if (visibility['ratsnest'] !== false) {
-        drawRatsnest(data, ratsnestGroup, hiddenNets, selectedNet, layerColors, bounds.maxDim)
+        drawRatsnest(data, ratsnestGroup, hiddenNets, selectedNet, layerColors, getScale())
       }
 
     } catch (e) {
@@ -488,6 +506,17 @@ export function createPcbRenderer(container: HTMLElement) {
     return tree.scaleX || 1
   }
 
+  function updateRatsnestWidth() {
+    if (!ratsnestGroup) return
+    const tree = app.tree as any
+    const w = 1 / Math.abs(tree.scaleX || 1)
+    ratsnestGroup.children.forEach((child) => {
+      if ((child as any).strokeWidth !== undefined) {
+        (child as any).strokeWidth = w
+      }
+    })
+  }
+
   function zoomBy(delta: number, cx?: number, cy?: number) {
     const tree = app.tree as any
     const sx = tree.scaleX || 1
@@ -508,6 +537,7 @@ export function createPcbRenderer(container: HTMLElement) {
       tree.scaleX = next * signX
       tree.scaleY = next * signY
     }
+    updateRatsnestWidth()
   }
 
   function panBy(dx: number, dy: number) {
@@ -701,6 +731,19 @@ function padWorldPos(comp: ComponentData, pin: NetPinRef | { x: number; y: numbe
   return [comp.location[0] + rx, comp.location[1] + ry]
 }
 
+class UnionFind {
+  private parent: number[]
+  constructor(n: number) {
+    this.parent = Array.from({ length: n }, (_, i) => i)
+  }
+  find(x: number): number {
+    return this.parent[x] === x ? x : (this.parent[x] = this.find(this.parent[x]))
+  }
+  union(a: number, b: number) {
+    this.parent[this.find(a)] = this.find(b)
+  }
+}
+
 function mstEdges(points: [number, number][]): Array<[number, number, number, number]> {
   if (points.length < 2) return []
   const edges: Array<{ i: number; j: number; d: number }> = []
@@ -731,26 +774,69 @@ function drawRatsnest(
   hiddenNets: Set<string>,
   selectedNet: string | null,
   layerColors: Record<string, string>,
-  maxDim: number
+  scale: number
 ) {
   if (!data.netPins || Object.keys(data.netPins).length === 0) return
   const imageMap = new Map(data.images.map((img) => [img.name, img]))
   const componentMap = new Map(data.components.map((c) => [c.refdes, c]))
-  const lineWidth = Math.max(maxDim * 0.0015, 1)
+  const lineWidth = 1 / Math.abs(scale || 1)
+  const tolerance = 1.0
 
   for (const [netName, refs] of Object.entries(data.netPins)) {
     if (hiddenNets.has(netName)) continue
-    const points: [number, number][] = []
+    const padPoints: [number, number][] = []
     for (const ref of refs) {
       const comp = componentMap.get(ref.refdes)
       const image = comp ? imageMap.get(comp.package) : undefined
       const pin = image?.pins.find((p) => p.pinNumber === ref.pinNumber)
       if (!comp || !pin) continue
-      points.push(padWorldPos(comp, pin))
+      padPoints.push(padWorldPos(comp, pin))
     }
+    if (padPoints.length < 2) continue
+
+    const netTraces = data.traces.filter((t) => t.netName === netName)
+    const netVias = data.vias.filter((v) => v.netName === netName)
+
+    // Build a point cloud of pads + trace corners + via centers, then union
+    // connected points so routed nets no longer show airwires between them.
+    const points: [number, number][] = [...padPoints]
+    for (const t of netTraces) {
+      for (const c of t.corners) points.push([c[0], c[1]])
+    }
+    for (const v of netVias) {
+      points.push([v.center[0], v.center[1]])
+    }
+    const uf = new UnionFind(points.length)
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        if (Math.hypot(points[i][0] - points[j][0], points[i][1] - points[j][1]) <= tolerance) {
+          uf.union(i, j)
+        }
+      }
+    }
+    let idx = padPoints.length
+    for (const t of netTraces) {
+      for (let k = 0; k < t.corners.length - 1; k++) {
+        uf.union(idx + k, idx + k + 1)
+      }
+      idx += t.corners.length
+    }
+
+    const groups = new Map<number, [number, number][]>()
+    for (let i = 0; i < padPoints.length; i++) {
+      const root = uf.find(i)
+      if (!groups.has(root)) groups.set(root, [])
+      groups.get(root)!.push(padPoints[i])
+    }
+    const reps: [number, number][] = []
+    for (const list of groups.values()) {
+      if (list.length > 0) reps.push(list[0])
+    }
+    if (reps.length < 2) continue
+
     const isSelected = selectedNet !== null && netName === selectedNet
     const color = isSelected ? '#ffffff' : (layerColors['ratsnest'] || RATSNEST_COLOR)
-    for (const [x1, y1, x2, y2] of mstEdges(points)) {
+    for (const [x1, y1, x2, y2] of mstEdges(reps)) {
       group.add(
         new Line({
           points: [x1, y1, x2, y2],

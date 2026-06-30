@@ -221,10 +221,50 @@ export const AppContext = createContext<{ state: AppState; dispatch: Dispatch<Ac
 
 export function useApp() { return useContext(AppContext) }
 
+export const RECENT_FILES_KEY = 'fr_recent_files'
+export const ROUTING_SETTINGS_KEY = 'fr_routing_settings'
+export const DISPLAY_UNIT_KEY = 'fr_display_unit'
+export const LANGUAGE_KEY = 'fr_language'
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const consoleWinRef = useRef<Window | null>(null)
   const consoleBufferRef = useRef<string[]>([])
+
+  useEffect(() => {
+    try {
+      const recent = localStorage.getItem(RECENT_FILES_KEY)
+      if (recent) dispatch({ type: 'SET_RECENT_FILES', files: JSON.parse(recent) })
+    } catch { /* ignore */ }
+    try {
+      const settings = localStorage.getItem(ROUTING_SETTINGS_KEY)
+      if (settings) dispatch({ type: 'SET_ROUTING_SETTINGS', settings: JSON.parse(settings) })
+    } catch { /* ignore */ }
+    try {
+      const unit = localStorage.getItem(DISPLAY_UNIT_KEY)
+      if (unit === 'mm' || unit === 'mil') dispatch({ type: 'SET_DISPLAY_UNIT', unit })
+    } catch { /* ignore */ }
+    try {
+      const lang = localStorage.getItem(LANGUAGE_KEY)
+      if (lang === 'en' || lang === 'zh') dispatch({ type: 'SET_LANGUAGE', lang })
+    } catch { /* ignore */ }
+  }, [dispatch])
+
+  useEffect(() => {
+    try { localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(state.recentFiles)) } catch { /* ignore */ }
+  }, [state.recentFiles])
+
+  useEffect(() => {
+    try { localStorage.setItem(ROUTING_SETTINGS_KEY, JSON.stringify(state.routingSettings)) } catch { /* ignore */ }
+  }, [state.routingSettings])
+
+  useEffect(() => {
+    try { localStorage.setItem(DISPLAY_UNIT_KEY, state.displayUnit) } catch { /* ignore */ }
+  }, [state.displayUnit])
+
+  useEffect(() => {
+    try { localStorage.setItem(LANGUAGE_KEY, state.language) } catch { /* ignore */ }
+  }, [state.language])
 
   useEffect(() => {
     const original = {

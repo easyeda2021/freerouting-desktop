@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, type ChangeEvent } from 'react'
-import { useApp } from '../App'
+import { useApp, RECENT_FILES_KEY, ROUTING_SETTINGS_KEY } from '../App'
 import { createSession, createJob, uploadDsn, startRouting, cancelRouting, setJobSettings, getDrcResults, streamLogs, streamOutput, getJobOutput, getJobStatus } from '../lib/api'
 import { parseSes } from '../lib/ses-parser'
 import { parseDsn } from '../lib/dsn-parser'
@@ -33,10 +33,6 @@ declare global {
     openURL: (url: string) => void
     openFileDialog: () => Promise<string> | string
     readFile: (path: string) => Promise<string> | string
-    getRecentFiles: () => Promise<string[]> | string[]
-    addRecentFile: (path: string) => Promise<void> | void
-    getRoutingSettings: () => Promise<Record<string, unknown>> | Record<string, unknown>
-    saveRoutingSettings: (settings: Record<string, unknown>) => Promise<void> | void
   }
 }
 
@@ -51,20 +47,14 @@ export default function MenuBar() {
   const [recentOpen, setRecentOpen] = useState(false)
 
   useEffect(() => {
-    ;(async () => {
-      try {
-        const files = window.getRecentFiles ? await window.getRecentFiles() : []
-        dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
-      } catch { /* ignore */ }
-      try {
-        if (window.getRoutingSettings) {
-          const saved = await window.getRoutingSettings()
-          if (saved && typeof saved === 'object') {
-            dispatch({ type: 'SET_ROUTING_SETTINGS', settings: saved as Record<string, string | number | boolean | undefined> })
-          }
-        }
-      } catch { /* ignore */ }
-    })()
+    try {
+      const raw = localStorage.getItem(RECENT_FILES_KEY)
+      if (raw) dispatch({ type: 'SET_RECENT_FILES', files: JSON.parse(raw) })
+    } catch { /* ignore */ }
+    try {
+      const raw = localStorage.getItem(ROUTING_SETTINGS_KEY)
+      if (raw) dispatch({ type: 'SET_ROUTING_SETTINGS', settings: JSON.parse(raw) })
+    } catch { /* ignore */ }
   }, [dispatch])
 
   useEffect(() => {
@@ -184,10 +174,14 @@ export default function MenuBar() {
       mergeTimerRef.current = null
     }
     try { localStorage.setItem('last_dsn_file', fileName) } catch { /* ignore */ }
-    if (fullPath && window.addRecentFile) {
-      await window.addRecentFile(fullPath)
-      const files = await window.getRecentFiles()
-      dispatch({ type: 'SET_RECENT_FILES', files: files || [] })
+    if (fullPath) {
+      try {
+        const raw = localStorage.getItem(RECENT_FILES_KEY)
+        const list: string[] = raw ? JSON.parse(raw) : []
+        const next = [fullPath, ...list.filter((p) => p !== fullPath)].slice(0, 10)
+        localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(next))
+        dispatch({ type: 'SET_RECENT_FILES', files: next })
+      } catch { /* ignore */ }
     }
 
     dispatch({ type: 'RESET' })
@@ -446,14 +440,14 @@ export default function MenuBar() {
 const s: Record<string, React.CSSProperties> = {
   bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, padding: '0 12px', background: '#16213e', borderBottom: '1px solid #0f3460', flexShrink: 0 },
   left: { display: 'flex', alignItems: 'center', gap: 8 },
-  btn: { padding: '5px 16px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
+  btn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 16px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
   activeBtn: { background: '#e94560', borderColor: '#e94560' },
-  fileName: { fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  fileName: { display: 'flex', alignItems: 'center', height: 28, fontSize: 12, color: '#e0e0e0', fontWeight: 500, marginLeft: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   right: { display: 'flex', alignItems: 'center', gap: 8 },
-  toggleBtn: { padding: '3px 10px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' },
+  toggleBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 10px', border: '1px solid #4a5568', borderRadius: 4, background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' },
   dropdownContainer: { position: 'relative', display: 'flex', alignItems: 'stretch' },
-  openBtn: { padding: '5px 12px', border: '1px solid #4a5568', borderRadius: '4px 0 0 4px', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
-  dropdownToggle: { padding: '5px 6px', border: '1px solid #4a5568', borderLeft: 'none', borderRadius: '0 4px 4px 0', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 10, fontWeight: 500 },
+  openBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: 28, padding: '0 12px', border: '1px solid #4a5568', borderRadius: '4px 0 0 4px', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' },
+  dropdownToggle: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 28, border: '1px solid #4a5568', borderLeft: 'none', borderRadius: '0 4px 4px 0', background: '#0f3460', color: '#e0e0e0', cursor: 'pointer', fontSize: 10, fontWeight: 500 },
   dropdownMenu: { position: 'absolute', top: '100%', left: 0, marginTop: 4, minWidth: 220, maxWidth: 320, background: '#16213e', border: '1px solid #0f3460', borderRadius: 4, zIndex: 100, maxHeight: 300, overflowY: 'auto' },
   dropdownItem: { padding: '6px 10px', fontSize: 11, color: '#ccc', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   dropdownEmpty: { padding: '6px 10px', fontSize: 11, color: '#888', fontStyle: 'italic' },
