@@ -192,14 +192,11 @@ export default function BoardCanvas() {
 
   useEffect(() => {
     const m = state.measurement
-    console.log('[measure effect]', m.active, 'start', m.start, 'end', m.end, 'cursor', m.cursor)
     if (!m.active) {
       rendererRef.current?.clearMeasurement()
     } else if (m.start && m.end) {
-      console.log('[measure effect] draw final')
       rendererRef.current?.drawMeasurement(m.start, m.end)
     } else if (m.start && m.cursor) {
-      console.log('[measure effect] draw preview')
       rendererRef.current?.drawMeasurementPreview(m.start, m.cursor)
     } else {
       rendererRef.current?.clearMeasurement()

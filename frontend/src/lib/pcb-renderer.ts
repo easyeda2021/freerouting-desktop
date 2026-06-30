@@ -390,7 +390,6 @@ export function createPcbRenderer(container: HTMLElement) {
   }
 
   function drawMeasurement(start: [number, number] | null, end: [number, number] | null) {
-    console.log('[drawMeasurement] called', start, end, 'children before clear:', (measurementGroup as any).children?.length)
     measurementGroup.clear()
     if (!start) return
 
@@ -443,27 +442,11 @@ export function createPcbRenderer(container: HTMLElement) {
     const midX = (start[0] + end[0]) / 2
     const midY = (start[1] + end[1]) / 2
 
-    // Perpendicular offset for dimension line
-    const offset = Math.max(lastBounds.maxDim * 0.015, 20)
+    // Offset label slightly perpendicular to the measurement line
+    const offset = Math.max(lastBounds.maxDim * 0.012, 12)
     const ox = -Math.sin(angle) * offset
     const oy = Math.cos(angle) * offset
 
-    const dimStart = [start[0] + ox, start[1] + oy] as [number, number]
-    const dimEnd = [end[0] + ox, end[1] + oy] as [number, number]
-
-    measurementGroup.add(
-      new Line({
-        points: [dimStart[0], dimStart[1], dimEnd[0], dimEnd[1]],
-        strokeWidth: lineWidth,
-        stroke: color,
-      })
-    )
-
-    // Tick marks at endpoints of dimension line
-    measurementGroup.add(new Line({ points: [start[0], start[1], start[0] + ox * 0.6, start[1] + oy * 0.6], strokeWidth: lineWidth, stroke: color }))
-    measurementGroup.add(new Line({ points: [end[0], end[1], end[0] + ox * 0.6, end[1] + oy * 0.6], strokeWidth: lineWidth, stroke: color }))
-
-    // Label background
     const label = formatLength(dist)
     const labelText = `${label.mm} / ${label.mil}`
     const fontSize = Math.max(lastBounds.maxDim * 0.012, 12)
@@ -482,11 +465,9 @@ export function createPcbRenderer(container: HTMLElement) {
     text.y = 0
     textGroup.add(text)
     measurementGroup.add(textGroup)
-    console.log('[drawMeasurement] final children:', (measurementGroup as any).children?.length)
   }
 
   function drawMeasurementPreview(start: [number, number] | null, cursor: [number, number] | null) {
-    console.log('[drawMeasurementPreview] called', start, cursor)
     measurementGroup.clear()
     if (!start || !cursor) return
 
@@ -527,11 +508,9 @@ export function createPcbRenderer(container: HTMLElement) {
         strokeJoin: 'round',
       })
     )
-    console.log('[drawMeasurementPreview] preview children:', (measurementGroup as any).children?.length)
   }
 
   function clearMeasurement() {
-    console.log('[clearMeasurement] called')
     measurementGroup.clear()
   }
 
