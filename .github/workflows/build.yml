@@ -122,9 +122,22 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Generate release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name='${{ github.event.inputs.version }}' --jq '.body')
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version }}
+          body: ${{ steps.notes.outputs.body }}
           files: artifacts/*
-          generate_release_notes: true
