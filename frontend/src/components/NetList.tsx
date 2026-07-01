@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useApp } from '../App'
 import { t } from '../lib/i18n'
 
@@ -6,6 +6,7 @@ export default function NetList() {
   const { state, dispatch } = useApp()
   const { boardData, nets, selectedNet, language } = state
   const [filter, setFilter] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useMemo(() => {
     if (!boardData) return
@@ -47,16 +48,37 @@ export default function NetList() {
   const filtered = nets.filter((n) => n.name.toLowerCase().includes(filter.toLowerCase()))
   const visibleCount = nets.filter((n) => n.visible).length
 
+  const clearFilter = () => {
+    setFilter('')
+    inputRef.current?.focus()
+  }
+
   return (
     <div style={s.panel}>
       <h3 style={s.title}>{t('nets', language)} ({visibleCount}/{nets.length})</h3>
-      <input
-        style={s.filter}
-        placeholder={t('filterNets', language)}
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        disabled={!boardData}
-      />
+      <div style={s.filterWrap}>
+        <input
+          ref={inputRef}
+          style={s.filter}
+          placeholder={t('filterNets', language)}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          disabled={!boardData}
+        />
+        {filter && (
+          <button
+            type="button"
+            style={s.clearBtn}
+            onClick={clearFilter}
+            title={t('clearFilter', language)}
+            aria-label={t('clearFilter', language)}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+      </div>
       <div style={s.list}>
         {boardData ? (
           filtered.map((net) => (
@@ -103,7 +125,9 @@ const s: Record<string, React.CSSProperties> = {
     minHeight: 0,
   },
   title: { fontSize: 11, fontWeight: 700, margin: '0 0 8px 0', color: '#8fa3bf', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #1c3a5e', borderRadius: 4, padding: '5px 8px', fontSize: 11, boxSizing: 'border-box', outline: 'none' },
+  filterWrap: { position: 'relative', width: '100%' },
+  filter: { width: '100%', background: '#0f3460', color: '#e0e0e0', border: '1px solid #1c3a5e', borderRadius: 4, padding: '5px 24px 5px 8px', fontSize: 11, boxSizing: 'border-box', outline: 'none' },
+  clearBtn: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', color: '#7e8fa8', cursor: 'pointer', padding: 0, borderRadius: '0 4px 4px 0' },
   list: { flex: 1, overflowY: 'auto', marginTop: 8, minHeight: 0 },
   item: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', fontSize: 11, cursor: 'pointer', borderRadius: 4, transition: 'background 0.1s' },
   selected: { background: '#0f3460' },
