@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v0.0.22)'
+        description: 'Version number (e.g. 0.0.22)'
         required: true
         type: string
       create_release:
@@ -123,21 +123,23 @@ jobs:
           merge-multiple: true
 
       - name: Generate release notes
-        id: notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BODY=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
-            -f tag_name='${{ github.event.inputs.version }}' --jq '.body')
-          {
-            echo "body<<EOF"
-            echo "$BODY"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name='${{ github.event.inputs.version }}' \
+            --jq '.body' > notes.md
 
       - name: Create or update release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.version }}
-          body: ${{ steps.notes.outputs.body }}
-          files: artifacts/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION='${{ github.event.inputs.version }}'
+          gh release create "$VERSION" \
+            --repo '${{ github.repository }}' \
+            --title "$VERSION" \
+            --notes-file notes.md \
+            artifacts/* 2>/dev/null || \
+          gh release edit "$VERSION" \
+            --repo '${{ github.repository }}' \
+            --notes-file notes.md
