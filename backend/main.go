@@ -73,7 +73,7 @@ func main() {
 
 	// Step 2: start HTTP server
 	fmux := http.NewServeMux()
-	fmux.Handle("/", http.FileServer(http.FS(sub)))
+	fmux.Handle("/", noCacheHandler(http.FileServer(http.FS(sub))))
 	go http.ListenAndServe("127.0.0.1:1421", fmux)
 	time.Sleep(200 * time.Millisecond)
 	log.Println("Step 2: HTTP server started")
@@ -104,7 +104,9 @@ func main() {
 	w.Bind("getAppVersion", func() string { return version })
 
 	log.Println("Step 4: navigating...")
-	w.Navigate("http://127.0.0.1:1421")
+	// Append the build version as a cache-busting query parameter so WebView2
+	// always fetches the freshly embedded frontend instead of a stale disk cache.
+	w.Navigate("http://127.0.0.1:1421?v=" + version)
 	log.Println("Step 5: running...")
 	w.Run()
 	log.Println("Window closed. Cleaning up FreeRouting process...")
@@ -119,4 +121,15 @@ func initialWindowSize() (int, int) {
 	if w < 1024 { w = 1024 }
 	if h < 768 { h = 768 }
 	return w, h
+}
+
+// noCacheHandler wraps a file server and disables HTTP caching so the embedded
+// frontend is always loaded fresh after each rebuild.
+func noCacheHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		next.ServeHTTP(w, r)
+	})
 }
