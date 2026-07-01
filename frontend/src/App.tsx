@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, type Dispatch } from 'react'
 import type { BoardData, LogEntry, FRStatusData, RoutingSettings, NetInfo, DrcViolation, SelectedObject, Measurement, Lang, DisplayUnit } from './lib/board-types'
+import { getDefaultLayerColor } from './lib/layer-colors'
 import MenuBar from './components/MenuBar'
 import BoardCanvas from './components/BoardCanvas'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -126,7 +127,14 @@ function reducer(state: AppState, action: Action): AppState {
       const visibility: Record<string, boolean> = {}
       action.data.layers.forEach((l) => { visibility[l.name] = state.layerVisibility[l.name] ?? true })
       visibility['ratsnest'] = state.layerVisibility['ratsnest'] ?? true
-      return { ...state, boardData: action.data, layerVisibility: visibility }
+
+      const layerColors: Record<string, string> = { ...state.layerColors }
+      action.data.layers.forEach((l) => {
+        if (!layerColors[l.name]) layerColors[l.name] = getDefaultLayerColor(l.name, l.index)
+      })
+      if (!layerColors['ratsnest']) layerColors['ratsnest'] = '#00bfff'
+
+      return { ...state, boardData: action.data, layerVisibility: visibility, layerColors }
     }
     case 'MERGE_BOARD_DATA': {
       if (!state.boardData) {
@@ -157,7 +165,14 @@ function reducer(state: AppState, action: Action): AppState {
       const visibility: Record<string, boolean> = {}
       merged.layers.forEach((l) => { visibility[l.name] = state.layerVisibility[l.name] ?? true })
       visibility['ratsnest'] = state.layerVisibility['ratsnest'] ?? true
-      return { ...state, boardData: merged, layerVisibility: visibility }
+
+      const layerColors: Record<string, string> = { ...state.layerColors }
+      merged.layers.forEach((l) => {
+        if (!layerColors[l.name]) layerColors[l.name] = getDefaultLayerColor(l.name, l.index)
+      })
+      if (!layerColors['ratsnest']) layerColors['ratsnest'] = '#00bfff'
+
+      return { ...state, boardData: merged, layerVisibility: visibility, layerColors }
     }
     case 'ADD_LOG':
       if (!action.entry || typeof action.entry !== 'object') return state

@@ -47,9 +47,7 @@ function normalizeLayerName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-export function getLayerColor(layerName: string, overrides?: Record<string, string>): string {
-  if (overrides?.[layerName]) return overrides[layerName]
-
+export function getDefaultLayerColor(layerName: string, layerIndex: number): string {
   const normalized = normalizeLayerName(layerName)
 
   // Ratsnest gets its own fixed color instead of the rotating palette.
@@ -59,13 +57,12 @@ export function getLayerColor(layerName: string, overrides?: Record<string, stri
     if (normalized.includes(key)) return color
   }
 
-  // Use FNV-1a so numeric suffixes (Inner1, Inner2, ...) produce different
-  // indices instead of colliding like the previous simple sum/Fibonacci hash.
-  let hash = 0x811c9dc5
-  for (let i = 0; i < normalized.length; i++) {
-    hash ^= normalized.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  const idx = (hash >>> 0) % DEFAULT_PALETTE.length
-  return DEFAULT_PALETTE[idx]
+  // Fall back to the palette using the layer index so adjacent / numbered
+  // layers (Inner1, Inner2, ...) always get distinct default colors.
+  return DEFAULT_PALETTE[layerIndex % DEFAULT_PALETTE.length]
+}
+
+export function getLayerColor(layerName: string, overrides?: Record<string, string>): string {
+  if (overrides?.[layerName]) return overrides[layerName]
+  return getDefaultLayerColor(layerName, 0)
 }
