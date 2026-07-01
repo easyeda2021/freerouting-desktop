@@ -31,8 +31,9 @@ const SEMANTIC_COLORS: [string, string][] = [
   ['bottomcopper', '#1976d2'],
   ['bottomlayer', '#1976d2'],
   ['backcopper', '#1976d2'],
+  // Do not map generic "inner" here; Inner1..InnerN should each get a
+  // distinct palette color instead of all sharing the same orange.
   ['innercopper', '#ff9800'],
-  ['inner', '#ff9800'],
   ['topsilk', '#ffeb3b'],
   ['bottomsilk', '#fff59d'],
   ['topsoldermask', '#009688'],
@@ -58,10 +59,13 @@ export function getLayerColor(layerName: string, overrides?: Record<string, stri
     if (normalized.includes(key)) return color
   }
 
-  // Use Fibonacci hashing so small changes in layer names map to distant
-  // palette indices, reducing the chance of adjacent layers getting similar
-  // default colors.
-  const hash = normalized.split('').reduce((h, c) => h + c.charCodeAt(0), 0)
-  const idx = Math.floor((hash * 0.6180339887498949) % DEFAULT_PALETTE.length)
+  // Use FNV-1a so numeric suffixes (Inner1, Inner2, ...) produce different
+  // indices instead of colliding like the previous simple sum/Fibonacci hash.
+  let hash = 0x811c9dc5
+  for (let i = 0; i < normalized.length; i++) {
+    hash ^= normalized.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  const idx = (hash >>> 0) % DEFAULT_PALETTE.length
   return DEFAULT_PALETTE[idx]
 }
