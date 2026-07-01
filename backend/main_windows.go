@@ -203,8 +203,12 @@ func startWindowWatcher(hwnd uintptr) {
 			}
 			exists, _, _ := procIsWindow.Call(hwnd)
 			if exists == 0 {
+				// The watcher runs on a background goroutine, but Terminate() uses
+				// PostQuitMessage which posts WM_QUIT to the calling thread. Use
+				// Dispatch to run Terminate() on the main WebView thread so the
+				// message loop actually exits.
 				if wv != nil {
-					wv.Terminate()
+					wv.Dispatch(func() { wv.Terminate() })
 				}
 				return
 			}
